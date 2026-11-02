@@ -1,5 +1,7 @@
 # CV as a Service
 
+[![CI](https://github.com/julioflores781/cv-as-a-service/actions/workflows/ci.yml/badge.svg)](https://github.com/julioflores781/cv-as-a-service/actions/workflows/ci.yml)
+
 Backend Quarkus con arquitectura hexagonal en tres módulos Maven. Ver [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ```
