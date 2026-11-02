@@ -1,0 +1,234 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "meta": {
+    "lang": "es",
+    "version": "2026.11.0",
+    "lastModified": "2026-11-02"
+  },
+  "basics": {
+    "name": "Julio Flores",
+    "label": "Senior Full Stack Engineer · foco backend",
+    "tagline": "Java/Quarkus & NestJS · Interoperabilidad sanitaria (HL7/FHIR)",
+    "email": "julioflores781@gmail.com",
+    "location": {
+      "city": "Monforte de Lemos",
+      "countryCode": "ES"
+    },
+    "summary": "Diseño microservicios backend que procesan miles de transacciones al día en entornos sanitarios de misión crítica. Empecé en contabilidad, pasé a soporte y análisis funcional, lideré la implantación de historia clínica electrónica en hospitales y hoy construyo las APIs que conectan esos sistemas. Esa visión de extremo a extremo me permite resolver problemas de negocio, no solo técnicos.",
+    "availability": "Abierto a roles backend / full stack en España o en remoto.",
+    "profiles": [
+      {
+        "network": "LinkedIn",
+        "url": "https://www.linkedin.com/in/julio-flores-193482141/"
+      },
+      {
+        "network": "GitHub",
+        "url": "https://github.com/julioflores781"
+      }
+    ]
+  },
+  "impact": [
+    {
+      "value": "+5.000",
+      "text": "mensajes diarios en un proxy HL7 v2.3.1 → REST"
+    },
+    {
+      "value": "+30.000",
+      "text": "usuarios gestionados por ese proxy en sus dos primeros meses"
+    },
+    {
+      "value": "+8",
+      "text": "microservicios Quarkus de interoperabilidad: turnos FHIR, farmacia, backoffice y seguridad"
+    },
+    {
+      "value": "+1.500",
+      "text": "usuarios y +38 torneos en una plataforma NestJS + MongoDB + Prisma"
+    },
+    {
+      "value": "+11 años",
+      "text": "de SQL en migraciones de datos con stored procedures y triggers de auditoría"
+    }
+  ],
+  "work": [
+    {
+      "id": "sale-and-brick",
+      "name": "Sale & Brick",
+      "position": "Full Stack Developer · foco backend",
+      "startDate": "2017-10",
+      "summary": "Progresión dentro de la misma empresa, de soporte a arquitectura de microservicios. Empecé en Argentina y me trasladé a España trabajando en remoto con la misma empresa.",
+      "phases": [
+        {
+          "title": "Soporte y análisis funcional",
+          "client": "Swiss Medical Group"
+        },
+        {
+          "title": "Liderazgo de implantación xHIS y Escritorio Clínico de DXC Technology",
+          "client": "Swiss Medical Group y Finochetto"
+        },
+        {
+          "title": "Microservicios Quarkus / Spring Boot / NestJS",
+          "client": "OSDE"
+        }
+      ],
+      "highlights": [
+        "Modernizo sistemas monolíticos legacy con microservicios en Quarkus, Spring Boot y NestJS, con arquitectura hexagonal en los proyectos NestJS.",
+        "Migración de datos desde sistemas legacy con stored procedures y triggers de auditoría, garantizando integridad y trazabilidad.",
+        "Autenticación con Auth0, incluido account linking, y funcionalidades en tiempo real con WebSocket.",
+        "APIs documentadas con OpenAPI/Swagger; pruebas unitarias y de integración automatizadas en los pipelines de merge request.",
+        "Entornos con Docker, Kubernetes (Tanzu) y Harbor, con CI/CD en GitLab.",
+        "Frontend con React y Vite; aplicaciones web sanitarias con JavaScript y React, y un sistema de monitoreo sanitario en Vue en producción con uno de nuestros clientes.",
+        "Trabajo en equipos ágiles con Scrum; gestión y priorización de incidencias.",
+        "Fuera de salud: monitorización satelital de parcelas, pagos con Stripe y email marketing con Amazon SES y Google Analytics."
+      ]
+    },
+    {
+      "id": "colombia-argentina-transition",
+      "name": "Traslado a Colombia y Argentina",
+      "position": "Etapa de transición",
+      "startDate": "2016-08",
+      "endDate": "2017-10",
+      "summary": "Entre Colombia y Argentina, donde empecé en Sale & Brick."
+    },
+    {
+      "id": "central-madeirense",
+      "name": "Central Madeirense",
+      "position": "Especialista de gestión de eventos TI",
+      "location": "Caracas, Venezuela",
+      "startDate": "2014-03",
+      "endDate": "2016-08",
+      "summary": "Monitorización de procesos críticos de transmisión y procesamiento de datos con Oracle, SQL Server y UC4. Herramientas internas con Shell Script, SQL y Linux."
+    },
+    {
+      "id": "schneider-it-support",
+      "name": "Schneider Electric Venezuela",
+      "position": "Analista de sistemas y soporte técnico",
+      "location": "Caracas, Venezuela",
+      "startDate": "2011-10",
+      "endDate": "2014-03",
+      "summary": "Servidores físicos y virtuales (ESXi 4/5), solicitudes vía Remedy, permisos en SAP y Active Directory, soporte AS/400 y reestructuración completa del cableado de red, documentada en planos."
+    },
+    {
+      "id": "schneider-accounting",
+      "name": "Schneider Electric Venezuela",
+      "position": "Analista de contabilidad",
+      "location": "Caracas, Venezuela",
+      "startDate": "2008-10",
+      "endDate": "2011-10",
+      "summary": "Mis inicios: de las conciliaciones bancarias y retenciones de impuestos a la informática."
+    }
+  ],
+  "education": [
+    {
+      "institution": "IUT Rufino Blanco Fombona",
+      "studyType": "Técnico Superior Universitario (T.S.U.)",
+      "area": "Informática"
+    }
+  ],
+  "certificates": [
+    {
+      "name": "Oracle Database SQL Expert (1Z0-047)",
+      "issuer": "Oracle University"
+    }
+  ],
+  "courses": [
+    {
+      "name": "Quarkus",
+      "issuer": "OpenWebinars"
+    },
+    {
+      "name": "Java Spring",
+      "issuer": "Platzi"
+    },
+    {
+      "name": "Java 17 Web Programming, Java Web API, Hibernate, Patrones de diseño, UML y UP, Git colaborativo, JavaScript avanzado y React JS",
+      "issuer": "EducacionIT"
+    }
+  ],
+  "skills": [
+    {
+      "group": "backend",
+      "name": "Backend",
+      "keywords": [
+        "Java 17+",
+        "Quarkus",
+        "Spring Boot",
+        "NestJS",
+        "TypeScript",
+        "Hibernate / JPA",
+        "Arquitectura hexagonal",
+        "REST",
+        "OpenAPI / Swagger",
+        "JUnit 5",
+        "Shell Script"
+      ]
+    },
+    {
+      "group": "data",
+      "name": "Datos",
+      "keywords": [
+        "PostgreSQL",
+        "MySQL",
+        "SQL Server",
+        "Oracle",
+        "MongoDB",
+        "Prisma",
+        "TypeORM"
+      ]
+    },
+    {
+      "group": "health",
+      "name": "Salud",
+      "keywords": [
+        "HL7 v2",
+        "FHIR",
+        "xHIS",
+        "Escritorio Clínico"
+      ]
+    },
+    {
+      "group": "platform",
+      "name": "Plataforma",
+      "keywords": [
+        "Docker",
+        "Kubernetes",
+        "Tanzu",
+        "Harbor",
+        "GitLab CI/CD",
+        "GitHub",
+        "Auth0",
+        "WebSocket",
+        "Stripe",
+        "Amazon SES",
+        "Linux"
+      ]
+    },
+    {
+      "group": "frontend",
+      "name": "Frontend",
+      "keywords": [
+        "React",
+        "Vite",
+        "JavaScript",
+        "Vue"
+      ]
+    },
+    {
+      "group": "methodology",
+      "name": "Metodología",
+      "keywords": [
+        "Scrum",
+        "Git"
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "language": "Español",
+      "fluency": "Nativo"
+    },
+    {
+      "language": "Inglés",
+      "fluency": "Básico"
+    }
+  ]
+}

@@ -1,0 +1,234 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "meta": {
+    "lang": "en",
+    "version": "2026.11.0",
+    "lastModified": "2026-11-02"
+  },
+  "basics": {
+    "name": "Julio Flores",
+    "label": "Senior Full Stack Engineer · backend focus",
+    "tagline": "Java/Quarkus & NestJS · Healthcare interoperability (HL7/FHIR)",
+    "email": "julioflores781@gmail.com",
+    "location": {
+      "city": "Monforte de Lemos",
+      "countryCode": "ES"
+    },
+    "summary": "I design backend microservices that process thousands of transactions a day in mission-critical healthcare environments. I started in accounting, moved into support and functional analysis, led electronic health record rollouts in hospitals, and now build the APIs that connect those systems. That end-to-end view lets me solve business problems, not just technical ones.",
+    "availability": "Open to backend / full stack roles in Spain or remote.",
+    "profiles": [
+      {
+        "network": "LinkedIn",
+        "url": "https://www.linkedin.com/in/julio-flores-193482141/"
+      },
+      {
+        "network": "GitHub",
+        "url": "https://github.com/julioflores781"
+      }
+    ]
+  },
+  "impact": [
+    {
+      "value": "5,000+",
+      "text": "daily messages through an HL7 v2.3.1 → REST proxy"
+    },
+    {
+      "value": "30,000+",
+      "text": "users served by that proxy in its first two months"
+    },
+    {
+      "value": "8+",
+      "text": "Quarkus interoperability microservices: FHIR scheduling, pharmacy, back office and security"
+    },
+    {
+      "value": "1,500+",
+      "text": "users and 38+ tournaments on a NestJS + MongoDB + Prisma platform"
+    },
+    {
+      "value": "11+ years",
+      "text": "of SQL in data migrations using stored procedures and audit triggers"
+    }
+  ],
+  "work": [
+    {
+      "id": "sale-and-brick",
+      "name": "Sale & Brick",
+      "position": "Full Stack Developer · backend focus",
+      "startDate": "2017-10",
+      "summary": "Progression within the same company, from support to microservices architecture. I started in Argentina and relocated to Spain while working remotely for the same company.",
+      "phases": [
+        {
+          "title": "Support and functional analysis",
+          "client": "Swiss Medical Group"
+        },
+        {
+          "title": "Led rollout of DXC Technology's xHIS and Clinical Desktop",
+          "client": "Swiss Medical Group and Finochetto"
+        },
+        {
+          "title": "Quarkus / Spring Boot / NestJS microservices",
+          "client": "OSDE"
+        }
+      ],
+      "highlights": [
+        "Modernize legacy monolithic systems with microservices in Quarkus, Spring Boot and NestJS, using hexagonal architecture in the NestJS projects.",
+        "Legacy data migration with stored procedures and audit triggers, preserving integrity and traceability.",
+        "Authentication with Auth0, including account linking, and real-time features with WebSocket.",
+        "APIs documented with OpenAPI/Swagger; unit and integration tests automated in merge request pipelines.",
+        "Environments with Docker, Kubernetes (Tanzu) and Harbor, with CI/CD on GitLab.",
+        "Frontend with React and Vite; healthcare web applications with JavaScript and React, and a Vue healthcare monitoring system running in production for one of our clients.",
+        "Agile teams with Scrum; incident handling and prioritization.",
+        "Beyond healthcare: satellite field monitoring, Stripe payments, and Amazon SES email marketing with Google Analytics."
+      ]
+    },
+    {
+      "id": "colombia-argentina-transition",
+      "name": "Relocation to Colombia and Argentina",
+      "position": "Transition period",
+      "startDate": "2016-08",
+      "endDate": "2017-10",
+      "summary": "Between Colombia and Argentina, where I started at Sale & Brick."
+    },
+    {
+      "id": "central-madeirense",
+      "name": "Central Madeirense",
+      "position": "IT event management specialist",
+      "location": "Caracas, Venezuela",
+      "startDate": "2014-03",
+      "endDate": "2016-08",
+      "summary": "Monitored critical data transmission and processing workflows with Oracle, SQL Server and UC4. Built internal tools with Shell Script, SQL and Linux."
+    },
+    {
+      "id": "schneider-it-support",
+      "name": "Schneider Electric Venezuela",
+      "position": "Systems analyst and IT support",
+      "location": "Caracas, Venezuela",
+      "startDate": "2011-10",
+      "endDate": "2014-03",
+      "summary": "Physical and virtual servers (ESXi 4/5), requests via Remedy, SAP and Active Directory permissions, AS/400 support, and a full network cabling restructure documented in floor plans."
+    },
+    {
+      "id": "schneider-accounting",
+      "name": "Schneider Electric Venezuela",
+      "position": "Accounting analyst",
+      "location": "Caracas, Venezuela",
+      "startDate": "2008-10",
+      "endDate": "2011-10",
+      "summary": "Where I started: from bank reconciliations and tax withholdings to software."
+    }
+  ],
+  "education": [
+    {
+      "institution": "IUT Rufino Blanco Fombona",
+      "studyType": "Higher Technical Degree (T.S.U.)",
+      "area": "Computer Science"
+    }
+  ],
+  "certificates": [
+    {
+      "name": "Oracle Database SQL Expert (1Z0-047)",
+      "issuer": "Oracle University"
+    }
+  ],
+  "courses": [
+    {
+      "name": "Quarkus",
+      "issuer": "OpenWebinars"
+    },
+    {
+      "name": "Java Spring",
+      "issuer": "Platzi"
+    },
+    {
+      "name": "Java 17 Web Programming, Java Web API, Hibernate, Design Patterns, UML and UP, Collaborative Git, Advanced JavaScript and React JS",
+      "issuer": "EducacionIT"
+    }
+  ],
+  "skills": [
+    {
+      "group": "backend",
+      "name": "Backend",
+      "keywords": [
+        "Java 17+",
+        "Quarkus",
+        "Spring Boot",
+        "NestJS",
+        "TypeScript",
+        "Hibernate / JPA",
+        "Hexagonal architecture",
+        "REST",
+        "OpenAPI / Swagger",
+        "JUnit 5",
+        "Shell Script"
+      ]
+    },
+    {
+      "group": "data",
+      "name": "Data",
+      "keywords": [
+        "PostgreSQL",
+        "MySQL",
+        "SQL Server",
+        "Oracle",
+        "MongoDB",
+        "Prisma",
+        "TypeORM"
+      ]
+    },
+    {
+      "group": "health",
+      "name": "Healthcare",
+      "keywords": [
+        "HL7 v2",
+        "FHIR",
+        "xHIS",
+        "Clinical Desktop"
+      ]
+    },
+    {
+      "group": "platform",
+      "name": "Platform",
+      "keywords": [
+        "Docker",
+        "Kubernetes",
+        "Tanzu",
+        "Harbor",
+        "GitLab CI/CD",
+        "GitHub",
+        "Auth0",
+        "WebSocket",
+        "Stripe",
+        "Amazon SES",
+        "Linux"
+      ]
+    },
+    {
+      "group": "frontend",
+      "name": "Frontend",
+      "keywords": [
+        "React",
+        "Vite",
+        "JavaScript",
+        "Vue"
+      ]
+    },
+    {
+      "group": "methodology",
+      "name": "Methodology",
+      "keywords": [
+        "Scrum",
+        "Git"
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "language": "Spanish",
+      "fluency": "Native"
+    },
+    {
+      "language": "English",
+      "fluency": "Basic"
+    }
+  ]
+}
