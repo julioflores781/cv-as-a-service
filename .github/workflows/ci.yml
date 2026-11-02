@@ -1,0 +1,151 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Solo se cancelan las ejecuciones de PR; una publicación en main no se interrumpe a medias.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Pruebas y cobertura
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      # Compila, ejecuta TODAS las pruebas (unitarias, REST, arquitectura) y genera los informes de JaCoCo.
+      - name: Build y pruebas
+        run: mvn -B verify
+
+      # Muestra en el resumen del pipeline el detalle de cada prueba y la cobertura.
+      # Falla si hay pruebas rotas, faltan informes o la cobertura baja de los umbrales.
+      - name: Resumen de pruebas y cobertura
+        if: always()
+        run: python3 scripts/ci-summary.py --min-total 90 --min-module 80 >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Subir informes de pruebas y cobertura
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: informes
+          path: |
+            */target/surefire-reports/
+            domain/target/site/jacoco/
+            application/target/site/jacoco/
+            infrastructure/target/jacoco-report/
+          if-no-files-found: warn
+          retention-days: 14
+
+      # Solo se publica lo que se ha probado: este mismo artefacto es el que entra en la imagen.
+      - name: Subir la aplicación probada
+        if: github.event_name == 'push'
+        uses: actions/upload-artifact@v7
+        with:
+          name: quarkus-app
+          path: infrastructure/target/quarkus-app/
+          if-no-files-found: error
+          retention-days: 1
+
+  docker:
+    name: Imagen Docker
+    needs: test # solo corre si TODAS las pruebas y los umbrales de cobertura pasan
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Comprobar credenciales de Docker Hub
+        run: |
+          if [ -z "$DOCKERHUB_USERNAME" ] || [ -z "$DOCKERHUB_TOKEN" ]; then
+            echo "::error::Faltan los secretos DOCKERHUB_USERNAME y/o DOCKERHUB_TOKEN (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v7
+
+      - name: Descargar la aplicación probada
+        uses: actions/download-artifact@v8
+        with:
+          name: quarkus-app
+          path: infrastructure/target/quarkus-app
+
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+
+      - uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Etiquetas y metadatos de la imagen
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/cv-api
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+
+      # 1) Construye una vez (amd64) y la deja local, para probarla antes de publicar nada.
+      - name: Construir imagen para probarla
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: cv-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Probar el contenedor (smoke test)
+        run: |
+          docker run -d --name cv-api -p 8080:8080 cv-api:ci
+          if ! scripts/smoke-test.sh http://localhost:8080; then
+            docker logs cv-api
+            exit 1
+          fi
+          docker rm -f cv-api
+
+      # 2) Si el contenedor responde bien, se publica (amd64 + arm64) reutilizando la caché del paso anterior.
+      - name: Publicar en Docker Hub
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+
+      - name: Resumen de la imagen publicada
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+        run: |
+          {
+            echo "## 🐳 Imagen publicada"
+            echo
+            echo "Imagen: \`${DOCKERHUB_USERNAME}/cv-api\` (linux/amd64, linux/arm64)"
+            echo
+            echo '```'
+            echo "$TAGS"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

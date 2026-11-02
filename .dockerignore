@@ -1,0 +1,3 @@
+# El contexto de build es solo el artefacto ya construido.
+*
+!infrastructure/target/quarkus-app
