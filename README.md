@@ -6,13 +6,14 @@ Backend Quarkus con arquitectura hexagonal en tres módulos Maven. Ver [ARCHITEC
 
 ```
 cv/
-├── content/         resume.es.json · resume.en.json (fuente única del contenido)
+├── db/sample/       CV ficticio (JSON + seed SQL) para pruebas y arranque sin datos privados
+├── private/         (ignorado por git) CV real y su seed: content/ · seed.sql
 ├── domain/          modelo de dominio puro (sin frameworks)
 ├── application/     casos de uso y puertos (solo depende de domain)
 └── infrastructure/  app Quarkus: adaptadores REST y de salida, ArchUnit
 ```
 
-Además: `scripts/` (resumen del pipeline y smoke test), `Dockerfile` y `.github/workflows/ci.yml`.
+Además: `scripts/` (resumen del pipeline, smoke test y generador del seed), `Dockerfile` y `.github/workflows/ci.yml`.
 
 ## Comandos
 
@@ -30,6 +31,21 @@ printf 'MSH|^~\\&|HIS|H|LAB|H|20260101||ADT^A01|M1|P|2.5.1\nPID|1||123^^^H^MR||P
 scripts/smoke-test.sh [http://localhost:8080]  # comprueba una instancia en marcha (health, API, errores, Swagger)
 python3 scripts/ci-summary.py                  # resumen de pruebas y cobertura tras un `mvn verify`
 ```
+
+## Base de datos y contenido
+
+El CV vive en PostgreSQL (tabla `resume_version`, una fila por versión e idioma; la activa es la que sirve la API).
+El esquema lo crea Flyway al arrancar. **El contenido real no está en el repositorio**: está en `private/` (ignorado por git).
+
+```bash
+# Publicar (o actualizar) el CV: genera el SQL y lo aplica. Cada ejecución crea la versión siguiente.
+python3 scripts/make-seed.py private/content -o private/seed.sql
+psql "$DATABASE_URL" --single-transaction -f private/seed.sql
+```
+
+Configuración de la API en producción (variables de entorno): `QUARKUS_DATASOURCE_JDBC_URL`,
+`QUARKUS_DATASOURCE_USERNAME` y `QUARKUS_DATASOURCE_PASSWORD`. En desarrollo y en las pruebas Quarkus levanta un
+PostgreSQL con Testcontainers por su cuenta (hace falta Docker); en dev arranca vacío: aplica un seed (el tuyo o `db/sample`).
 
 Swagger UI en `/swagger/` y el contrato en `/openapi.json` (con `Accept: application/json`; por defecto sirve YAML).
 

@@ -4,7 +4,7 @@ Guía para trabajar en este repositorio. Estado a **2026-11-03**.
 
 ## Qué es
 El CV de Julio Flores como una **API REST de solo lectura**: Quarkus 3.40, Java 21, arquitectura hexagonal en tres módulos Maven
-(`domain`, `application`, `infrastructure`). El contenido vive en `content/resume.{es,en}.json`. Es un portfolio de un perfil
+(`domain`, `application`, `infrastructure`). El contenido vive en PostgreSQL (tabla `resume_version`, JSONB versionado); el real no está en el repo. Es un portfolio de un perfil
 senior (backend/full stack, nicho sanitario HL7/FHIR): la arquitectura es una demostración deliberada, pero **sin sobreingeniería**.
 Diseño y decisiones: [ARCHITECTURE.md](ARCHITECTURE.md). Comandos, cobertura y CI: [README.md](README.md).
 
@@ -23,7 +23,7 @@ Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config`
 - **Errores:** las excepciones de negocio extienden `ApplicationException(ErrorCode, mensajeEnInglés, args…)`. Para un error nuevo: constante en `ErrorCode` (si es de negocio) y en `ApiError` (estado HTTP), y `CODIGO.title` / `CODIGO.detail` en `problems_es.properties` y `problems_en.properties`. `ProblemCatalogTest` falla si falta algo. Los apóstrofos en los `.properties` se duplican (`''`).
 - **Idioma:** `?lang` > `Accept-Language` > español. Solo se traducen el contenido y los mensajes de error, no Swagger ni los logs.
 - **Swagger:** cada endpoint documenta todas sus salidas (200/404/500) con ejemplos. `OpenApiDocumentTest` falla si falta documentación.
-- **Contenido:** `content/resume.*.json` los edita su dueño a mano; léelos antes de tocarlos y mantén ES y EN con la **misma estructura**. Nunca teléfono, documento de identidad ni fecha de nacimiento.
+- **Contenido:** el real está en `private/content/resume.*.json` (ignorado por git), lo edita su dueño a mano; léelo antes de tocarlo y mantén ES y EN con la **misma estructura**. Se publica con `scripts/make-seed.py` + `psql` (ver README). Nunca teléfono, documento de identidad ni fecha de nacimiento. Las pruebas usan el CV ficticio de `db/sample` (Ada Ejemplo); no pongas datos reales en el repo.
 - **Pruebas:** cobertura mínima 90 % total y 80 % por módulo (la comprueba `ci-summary.py`). Todo código nuevo lleva pruebas.
 - **Commits:** Conventional Commits en inglés, **sin** `Co-Authored-By` ni líneas de atribución.
 - **CI:** un push a `main` publica una imagen en Docker Hub (`julioflores781/cv-api`). En cambios solo de documentación añade `[skip ci]` al mensaje.
@@ -32,7 +32,9 @@ Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config`
 - En `@QuarkusTest` **no hagas peticiones HTTP dentro de un `@BeforeAll`**: según el orden de arranque da 500, `ClassNotFound` o conexión rechazada. Carga de forma perezosa dentro de los tests.
 - `archunit-junit5` 1.5.1 no funciona con JUnit 6 (el de Quarkus): ejecuta 0 pruebas sin avisar. Usa la API principal de ArchUnit.
 - `quarkus.swagger-ui.path` lleva barra inicial (`/swagger`); sin ella Quarkus lo cuelga de `/q/`.
-- `content/` solo puede contener los JSON: es directorio de recursos y `quarkus:dev` copia todo lo que haya dentro.
+- Las pruebas necesitan Docker (Testcontainers levanta PostgreSQL). `db/sample/V1000__sample_resume.sql` se **genera**: si editas `db/sample/*.json`, regénerala con `scripts/make-seed.py`.
+- Flyway va con `placeholder-replacement=false` (el JSON del CV puede llevar `${`) y el seed usa `$resume$` seguido de salto de línea (`$resume${` sería un marcador).
+- **No fusionar a `main` hasta adaptar el CI**: el smoke test de la imagen arranca el contenedor sin base de datos y fallaría.
 - Las pruebas de adaptadores de `infrastructure` deben ser `@QuarkusTest` (con `@Inject`): `quarkus-jacoco` solo mide lo que se carga dentro de Quarkus, y una prueba JUnit plana no suma cobertura.
 - HL7: solo v2.5.1 (`hapi-structures-v251`) y los tipos `ADT^A01`/`ORU^R01`; otros dan `422 HL7_UNSUPPORTED_MESSAGE`. Un OBX sin su OBR no encaja en la estructura ORU y se descarta sin error. El cuerpo nunca se registra en logs. Las versiones de HAPI están en el `pom` raíz.
 - La cobertura de `infrastructure` se limita a sus propias clases (`quarkus.jacoco.includes`); si no, `domain`/`application` salen con 0 %.

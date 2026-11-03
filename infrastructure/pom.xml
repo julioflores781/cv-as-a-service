@@ -41,6 +41,22 @@
       <artifactId>quarkus-smallrye-health</artifactId>
     </dependency>
     <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-agroal</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-jdbc-postgresql</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.quarkus</groupId>
+      <artifactId>quarkus-flyway</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.flywaydb</groupId>
+      <artifactId>flyway-database-postgresql</artifactId>
+    </dependency>
+    <dependency>
       <groupId>ca.uhn.hapi</groupId>
       <artifactId>hapi-structures-v251</artifactId>
     </dependency>
@@ -72,16 +88,19 @@
   </dependencies>
 
   <build>
-    <resources>
-      <resource>
-        <directory>src/main/resources</directory>
-      </resource>
-      <!-- Fuente única del contenido. Este directorio debe contener solo los JSON:
-           el modo dev de Quarkus copia todo lo que haya en un directorio de recursos. -->
-      <resource>
-        <directory>${project.basedir}/../content</directory>
-      </resource>
-    </resources>
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+      <!-- CV ficticio que las pruebas cargan como migración Flyway (ver db/sample/README). -->
+      <testResource>
+        <directory>${project.basedir}/../db/sample</directory>
+        <targetPath>db/testdata</targetPath>
+        <includes>
+          <include>V*.sql</include>
+        </includes>
+      </testResource>
+    </testResources>
     <plugins>
       <plugin>
         <groupId>io.quarkus.platform</groupId>
