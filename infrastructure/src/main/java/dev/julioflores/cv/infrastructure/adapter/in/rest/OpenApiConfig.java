@@ -31,7 +31,9 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
                         |---|---|
                         | `404` | El recurso pedido no existe (id de experiencia o grupo de skills desconocido), \
                         no hay CV publicado en ese idioma, o la ruta no existe. |
-                        | `405` | Se usó un método distinto de `GET` en un endpoint de lectura. |
+                        | `400` / `413` / `422` | Solo en la demo HL7: cuerpo vacío o formato desconocido (`400`), \
+                        mensaje de más de 64 KB (`413`), mensaje ilegible o de un tipo no soportado (`422`). |
+                        | `405` | Se usó un método no admitido por el endpoint (los de lectura solo admiten `GET`). |
                         | `500` | Error inesperado. El detalle no revela información interna. |
 
                         Los códigos posibles y su estado HTTP están listados en el esquema `Problem`.
@@ -47,7 +49,12 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
                         name = "Julio Flores",
                         email = "julioflores781@gmail.com",
                         url = "https://github.com/julioflores781")),
-        tags = @Tag(
-                name = "Resume",
-                description = "Contenido del CV: perfil, cifras, experiencia, skills, formación y contacto."))
+        tags = {
+            @Tag(
+                    name = "Resume",
+                    description = "Contenido del CV: perfil, cifras, experiencia, skills, formación y contacto."),
+            @Tag(
+                    name = "HL7",
+                    description = "Demo de interoperabilidad sanitaria: traduce mensajes HL7 v2 a JSON o FHIR R4.")
+        })
 public class OpenApiConfig extends Application {}

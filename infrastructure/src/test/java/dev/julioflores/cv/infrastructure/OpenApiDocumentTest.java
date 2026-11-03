@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.path.json.JsonPath;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -17,6 +18,9 @@ import org.junit.jupiter.api.Test;
 @QuarkusTest
 class OpenApiDocumentTest {
 
+    private static final String HL7_PATH = "/api/v1/hl7/translate";
+
+    /** Endpoints de lectura (GET). El POST de la demo HL7 se comprueba aparte. */
     private static final Set<String> ENDPOINTS = Set.of(
             "/api/v1/profile", "/api/v1/impact", "/api/v1/experience", "/api/v1/experience/{id}",
             "/api/v1/skills", "/api/v1/education", "/api/v1/contact", "/api/v1/resume");
@@ -43,7 +47,9 @@ class OpenApiDocumentTest {
     void everyEndpointIsPresentAndOnlyThose() {
         Set<String> documented = doc().<Map<String, Object>>getJsonObject("paths").keySet();
         documented.removeIf(p -> !p.startsWith("/api/v1"));
-        assertEquals(ENDPOINTS, documented);
+        Set<String> expected = new HashSet<>(ENDPOINTS);
+        expected.add(HL7_PATH);
+        assertEquals(expected, documented);
     }
 
     @Test
@@ -172,6 +178,71 @@ class OpenApiDocumentTest {
         assertEquals("Experience not found", doc().getString(examples + ".unknownIdEn.value.title"));
         assertEquals("UNEXPECTED",
                 doc().getString("paths.'/api/v1/profile'.get.responses.'500'.content.'application/problem+json'.example.code"));
+    }
+
+    // ── Demo HL7 (POST) ─────────────────────────────────────────────────────────
+
+    private Map<String, Object> hl7() {
+        return doc().getMap("paths.'" + HL7_PATH + "'.post");
+    }
+
+    @Test
+    void hl7OperationIsDocumented() {
+        assertEquals("translateHl7", hl7().get("operationId"));
+        assertEquals(List.of("HL7"), hl7().get("tags"));
+        assertNotNull(hl7().get("summary"));
+        String description = (String) hl7().get("description");
+        for (String needle : List.of("HL7 v2.5.1", "ADT^A01", "ORU^R01", "64 KB", "no se guarda")) {
+            assertTrue(description.contains(needle), "la descripción no menciona " + needle);
+        }
+        List<Map<String, Object>> tags = doc().getList("tags");
+        assertTrue(tags.stream().anyMatch(t -> "HL7".equals(t.get("name")) && t.get("description") != null));
+    }
+
+    @Test
+    void hl7DocumentsItsRequestBodyAndFormatParameter() {
+        String body = "paths.'" + HL7_PATH + "'.post.requestBody";
+        assertEquals(Boolean.TRUE, doc().getBoolean(body + ".required"));
+        assertNotNull(doc().get(body + ".description"));
+        assertNotNull(doc().get(body + ".content.'text/plain'.examples.admission.value"));
+        assertNotNull(doc().get(body + ".content.'text/plain'.examples.labResult.value"));
+
+        List<Map<String, Object>> params = doc().getList("paths.'" + HL7_PATH + "'.post.parameters");
+        Map<String, Object> format = params.stream().filter(p -> "format".equals(p.get("name"))).findFirst().orElseThrow();
+        assertEquals("query", format.get("in"));
+        assertNotNull(format.get("description"));
+        List<String> names = params.stream().map(p -> (String) p.get("name")).toList();
+        assertTrue(names.contains("lang") && names.contains("Accept-Language"));
+    }
+
+    @Test
+    void hl7DocumentsEveryOutputWithExamples() {
+        Map<String, Object> responses = doc().getMap("paths.'" + HL7_PATH + "'.post.responses");
+        assertEquals(Set.of("200", "400", "413", "422", "500"), responses.keySet());
+        for (String code : responses.keySet()) {
+            String response = "paths.'" + HL7_PATH + "'.post.responses.'" + code + "'";
+            assertNotNull(doc().get(response + ".description"), code);
+            assertFalse(doc().getMap(response + ".content").isEmpty(), code);
+        }
+        for (String media : List.of("application/json", "application/fhir+json")) {
+            String ok = "paths.'" + HL7_PATH + "'.post.responses.'200'.content.'" + media + "'.examples";
+            assertNotNull(doc().get(ok + ".admission.value"), media);
+            assertNotNull(doc().get(ok + ".labResult.value"), media);
+        }
+        String problems = "paths.'" + HL7_PATH + "'.post.responses.'%s'.content.'application/problem+json'";
+        assertEquals("HL7_EMPTY_BODY", doc().getString(problems.formatted("400") + ".examples.emptyBody.value.code"));
+        assertEquals("HL7_UNSUPPORTED_FORMAT", doc().getString(problems.formatted("400") + ".examples.unknownFormat.value.code"));
+        assertEquals("HL7_PAYLOAD_TOO_LARGE", doc().getString(problems.formatted("413") + ".examples.tooLarge.value.code"));
+        assertEquals("HL7_INVALID_MESSAGE", doc().getString(problems.formatted("422") + ".examples.notHl7.value.code"));
+        assertEquals("HL7_UNSUPPORTED_MESSAGE", doc().getString(problems.formatted("422") + ".examples.unsupportedType.value.code"));
+        assertEquals("UNEXPECTED", doc().getString(problems.formatted("500") + ".example.code"));
+    }
+
+    @Test
+    void problemSchemaListsTheHl7Codes() {
+        String description = doc().getString("components.schemas.Problem.properties.code.description");
+        assertTrue(description.contains("`HL7_INVALID_MESSAGE` (422)"));
+        assertTrue(description.contains("`HL7_PAYLOAD_TOO_LARGE` (413)"));
     }
 
     @Test

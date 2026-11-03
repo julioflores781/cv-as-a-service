@@ -8,5 +8,10 @@ package dev.julioflores.cv.application.error;
 public enum ErrorCode {
     RESUME_NOT_FOUND,
     EXPERIENCE_NOT_FOUND,
-    SKILL_GROUP_NOT_FOUND
+    SKILL_GROUP_NOT_FOUND,
+    HL7_EMPTY_BODY,
+    HL7_PAYLOAD_TOO_LARGE,
+    HL7_UNSUPPORTED_FORMAT,
+    HL7_INVALID_MESSAGE,
+    HL7_UNSUPPORTED_MESSAGE
 }

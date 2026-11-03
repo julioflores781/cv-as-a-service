@@ -20,6 +20,10 @@ Además: `scripts/` (resumen del pipeline y smoke test), `Dockerfile` y `.github
 mvn verify                                     # compila y ejecuta todas las pruebas
 mvn quarkus:dev -pl infrastructure -am         # modo desarrollo en http://localhost:8080
 curl 'localhost:8080/api/v1/profile?lang=en'
+
+# Demo HL7: traduce un mensaje v2.5.1 a un Bundle FHIR R4 (solo mensajes sintéticos)
+printf 'MSH|^~\\&|HIS|H|LAB|H|20260101||ADT^A01|M1|P|2.5.1\nPID|1||123^^^H^MR||Perez^Juan||19800101|M' |
+  curl -X POST -H 'Content-Type: text/plain' --data-binary @- 'localhost:8080/api/v1/hl7/translate?format=fhir'
 ```
 
 ```bash

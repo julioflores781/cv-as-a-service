@@ -7,6 +7,8 @@ import dev.julioflores.cv.application.port.in.GetImpactUseCase;
 import dev.julioflores.cv.application.port.in.GetProfileUseCase;
 import dev.julioflores.cv.application.port.in.GetResumeUseCase;
 import dev.julioflores.cv.application.port.in.GetSkillsUseCase;
+import dev.julioflores.cv.application.port.in.TranslateHl7UseCase;
+import dev.julioflores.cv.application.port.out.Hl7Translator;
 import dev.julioflores.cv.application.port.out.ResumeRepository;
 import dev.julioflores.cv.application.service.GetContactService;
 import dev.julioflores.cv.application.service.GetEducationService;
@@ -15,6 +17,7 @@ import dev.julioflores.cv.application.service.GetImpactService;
 import dev.julioflores.cv.application.service.GetProfileService;
 import dev.julioflores.cv.application.service.GetResumeService;
 import dev.julioflores.cv.application.service.GetSkillsService;
+import dev.julioflores.cv.application.service.TranslateHl7Service;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 
@@ -62,5 +65,11 @@ public class UseCaseConfig {
     @ApplicationScoped
     GetResumeUseCase getResume(ResumeRepository resumes) {
         return new GetResumeService(resumes);
+    }
+
+    @Produces
+    @ApplicationScoped
+    TranslateHl7UseCase translateHl7(Hl7Translator translator) {
+        return new TranslateHl7Service(translator);
     }
 }

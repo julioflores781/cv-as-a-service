@@ -16,7 +16,7 @@ import org.eclipse.microprofile.openapi.models.responses.APIResponse;
 import org.eclipse.microprofile.openapi.models.responses.APIResponses;
 
 /**
- * Documenta lo que es común a todos los GET de /api/v1: las cabeceras de caché de los 200 y el 500.
+ * Documenta lo que es común a /api/v1: las cabeceras de caché de los 200 de los GET y el 500 de cada operación.
  * Así no se repite en cada método (ver {@link ApiCacheHeaders} y las constantes que comparte).
  */
 public class OpenApiResponseFilter implements OASFilter {
@@ -30,25 +30,33 @@ public class OpenApiResponseFilter implements OASFilter {
         }
         documentErrorCodes(openAPI);
         openAPI.getPaths().getPathItems().forEach((path, item) -> {
-            if (!path.startsWith("/api/v1") || item.getGET() == null) {
+            if (!path.startsWith("/api/v1")) {
                 return;
             }
-            APIResponses responses = item.getGET().getResponses();
-            APIResponse ok = responses.getAPIResponse("200");
-            if (ok != null) {
-                ok.addHeader(HttpHeaders.CACHE_CONTROL,
-                        header("Caché pública durante 5 minutos.", ApiCacheHeaders.CACHE_CONTROL_VALUE));
-                ok.addHeader(HttpHeaders.VARY, header(
-                        "La respuesta depende del idioma: se cachea por separado según `Accept-Language`.",
-                        ApiCacheHeaders.VARY_VALUE));
+            if (item.getGET() != null) {
+                APIResponse ok = item.getGET().getResponses().getAPIResponse("200");
+                if (ok != null) {
+                    ok.addHeader(HttpHeaders.CACHE_CONTROL,
+                            header("Caché pública durante 5 minutos.", ApiCacheHeaders.CACHE_CONTROL_VALUE));
+                    ok.addHeader(HttpHeaders.VARY, header(
+                            "La respuesta depende del idioma: se cachea por separado según `Accept-Language`.",
+                            ApiCacheHeaders.VARY_VALUE));
+                }
+                addUnexpected(item.getGET().getResponses());
             }
-            responses.addAPIResponse("500", OASFactory.createAPIResponse()
-                    .description("Error inesperado. El detalle no revela información interna y el error no se cachea.")
-                    .content(OASFactory.createContent().addMediaType(ProblemResponse.MEDIA_TYPE,
-                            OASFactory.createMediaType()
-                                    .schema(OASFactory.createSchema().ref("#/components/schemas/Problem"))
-                                    .example(UNEXPECTED_EXAMPLE))));
+            if (item.getPOST() != null) {
+                addUnexpected(item.getPOST().getResponses());
+            }
         });
+    }
+
+    private static void addUnexpected(APIResponses responses) {
+        responses.addAPIResponse("500", OASFactory.createAPIResponse()
+                .description("Error inesperado. El detalle no revela información interna y el error no se cachea.")
+                .content(OASFactory.createContent().addMediaType(ProblemResponse.MEDIA_TYPE,
+                        OASFactory.createMediaType()
+                                .schema(OASFactory.createSchema().ref("#/components/schemas/Problem"))
+                                .example(UNEXPECTED_EXAMPLE))));
     }
 
     /** Los códigos del esquema Problem salen del enum ApiError, así la documentación no se desincroniza. */

@@ -33,19 +33,21 @@ Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config`
 - `archunit-junit5` 1.5.1 no funciona con JUnit 6 (el de Quarkus): ejecuta 0 pruebas sin avisar. Usa la API principal de ArchUnit.
 - `quarkus.swagger-ui.path` lleva barra inicial (`/swagger`); sin ella Quarkus lo cuelga de `/q/`.
 - `content/` solo puede contener los JSON: es directorio de recursos y `quarkus:dev` copia todo lo que haya dentro.
+- Las pruebas de adaptadores de `infrastructure` deben ser `@QuarkusTest` (con `@Inject`): `quarkus-jacoco` solo mide lo que se carga dentro de Quarkus, y una prueba JUnit plana no suma cobertura.
+- HL7: solo v2.5.1 (`hapi-structures-v251`) y los tipos `ADT^A01`/`ORU^R01`; otros dan `422 HL7_UNSUPPORTED_MESSAGE`. Un OBX sin su OBR no encaja en la estructura ORU y se descarta sin error. El cuerpo nunca se registra en logs. Las versiones de HAPI están en el `pom` raíz.
 - La cobertura de `infrastructure` se limita a sus propias clases (`quarkus.jacoco.includes`); si no, `domain`/`application` salen con 0 %.
 
 ## Hecho
-Dominio completo, 7 casos de uso, endpoints `GET /api/v1/{profile,impact,experience[/{id}],skills,education,contact,resume}`,
-errores RFC 7807 con `code` estable y textos ES/EN, Swagger completo, 84 pruebas (93,9 % de cobertura de líneas), pipeline
+Dominio completo, 8 casos de uso, endpoints `GET /api/v1/{profile,impact,experience[/{id}],skills,education,contact,resume}`,
+**demo HL7** `POST /api/v1/hl7/translate?format=json|fhir` (HAPI; ADT^A01 y ORU^R01 en v2.5.1; mapeo manual a FHIR R4),
+errores RFC 7807 con `code` estable y textos ES/EN, Swagger completo, 122 pruebas (95,2 % de cobertura de líneas), pipeline
 de GitHub Actions (pruebas + cobertura → imagen Docker con smoke test, amd64 y arm64).
 
 ## Siguiente (orden recomendado)
-1. **Demo HL7:** `POST /hl7/translate?format=json|fhir` con HAPI; máx. 64 KB, sin guardar ni loguear el cuerpo, solo mensajes sintéticos.
-2. **ADRs** cortos en `docs/adr/` (multi-módulo vs paquetes, Quarkus vs NestJS, errores con código estable, alcance del i18n).
-3. **Exportaciones:** `/llms.txt`, `/resume.pdf` (openhtmltopdf desde Qute), `/resume?format=jsonresume`, `ETag`.
-4. **Front Next.js** estático (ES por defecto, SEO, lee `/api/v1/resume` en el build).
-5. **PostgreSQL + Flyway** (`resume_version` jsonb, `contact_message`, `page_view_daily`), `/status`, docker-compose para el NAS, Cloudflare Tunnel.
+1. **ADRs** cortos en `docs/adr/` (multi-módulo vs paquetes, Quarkus vs NestJS, errores con código estable, alcance del i18n).
+2. **Exportaciones:** `/llms.txt`, `/resume.pdf` (openhtmltopdf desde Qute), `/resume?format=jsonresume`, `ETag`.
+3. **Front Next.js** estático (ES por defecto, SEO, lee `/api/v1/resume` en el build).
+4. **PostgreSQL + Flyway** (`resume_version` jsonb, `contact_message`, `page_view_daily`), `/status`, docker-compose para el NAS, Cloudflare Tunnel.
 
 Pendiente menor: los ids de experiencia distinguen mayúsculas y los grupos de skills no; unificar en una línea, sin tipos nuevos.
 Pendiente del contenido (de su dueño): fechas de las fases dentro de Sale & Brick y confirmar las cifras de impacto.
