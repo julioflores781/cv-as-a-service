@@ -54,8 +54,9 @@ PostgreSQL con Testcontainers por su cuenta (hace falta Docker); en dev arranca 
 ### Despliegue en el NAS
 
 `deploy/docker-compose.yml` se pega tal cual en el editor de compose del NAS (sin `.env`): cambia las contraseñas, el
-puerto y `QUARKUS_HTTP_CORS_ORIGINS` (el dominio de la web; sin él el navegador no puede llamar a la API).
-Levanta `cv-api` + `cv-db` (la base de datos no publica puertos). El túnel de Cloudflare apunta al puerto publicado.
+y `QUARKUS_HTTP_CORS_ORIGINS` (el dominio de la web; sin él el navegador no puede llamar a la API).
+Levanta `cv-api` + `cv-db` (la base de datos no publica puertos). `cv-api` se une a la red `padelhub_default`, donde ya corren
+los `cloudflared`: en Cloudflare Tunnel el servicio es `http://cv-api:8080`, sin IPs ni puertos publicados.
 
 ```bash
 # Publicar el CV (desde un terminal con acceso a Docker del NAS; copia antes private/seed.sql allí)
