@@ -24,6 +24,8 @@
     <compiler-plugin.version>3.14.0</compiler-plugin.version>
     <surefire-plugin.version>3.5.3</surefire-plugin.version>
     <jacoco.version>0.8.16</jacoco.version>
+    <hapi-hl7v2.version>2.6.0</hapi-hl7v2.version>
+    <hapi-fhir.version>8.12.1</hapi-fhir.version>
   </properties>
 
   <dependencyManagement>
@@ -39,6 +41,16 @@
         <groupId>com.tngtech.archunit</groupId>
         <artifactId>archunit</artifactId>
         <version>${archunit.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ca.uhn.hapi</groupId>
+        <artifactId>hapi-structures-v251</artifactId>
+        <version>${hapi-hl7v2.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>ca.uhn.hapi.fhir</groupId>
+        <artifactId>hapi-fhir-structures-r4</artifactId>
+        <version>${hapi-fhir.version}</version>
       </dependency>
       <dependency>
         <groupId>dev.julioflores</groupId>

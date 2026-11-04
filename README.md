@@ -6,13 +6,15 @@ Backend Quarkus con arquitectura hexagonal en tres módulos Maven. Ver [ARCHITEC
 
 ```
 cv/
-├── content/         resume.es.json · resume.en.json (fuente única del contenido)
+├── deploy/          docker-compose para el NAS (API + PostgreSQL) y copia de seguridad
+├── db/sample/       CV ficticio (JSON + seed SQL) para pruebas y arranque sin datos privados
+├── private/         (ignorado por git) CV real y su seed: content/ · seed.sql
 ├── domain/          modelo de dominio puro (sin frameworks)
 ├── application/     casos de uso y puertos (solo depende de domain)
 └── infrastructure/  app Quarkus: adaptadores REST y de salida, ArchUnit
 ```
 
-Además: `scripts/` (resumen del pipeline y smoke test), `Dockerfile` y `.github/workflows/ci.yml`.
+Además: `scripts/` (resumen del pipeline, smoke test y generador del seed), `Dockerfile` y `.github/workflows/ci.yml`.
 
 ## Comandos
 
@@ -20,11 +22,45 @@ Además: `scripts/` (resumen del pipeline y smoke test), `Dockerfile` y `.github
 mvn verify                                     # compila y ejecuta todas las pruebas
 mvn quarkus:dev -pl infrastructure -am         # modo desarrollo en http://localhost:8080
 curl 'localhost:8080/api/v1/profile?lang=en'
+
+# Demo HL7: traduce un mensaje v2.5.1 a un Bundle FHIR R4 (solo mensajes sintéticos)
+printf 'MSH|^~\\&|HIS|H|LAB|H|20260101||ADT^A01|M1|P|2.5.1\nPID|1||123^^^H^MR||Perez^Juan||19800101|M' |
+  curl -X POST -H 'Content-Type: text/plain' --data-binary @- 'localhost:8080/api/v1/hl7/translate?format=fhir'
 ```
 
 ```bash
 scripts/smoke-test.sh [http://localhost:8080]  # comprueba una instancia en marcha (health, API, errores, Swagger)
 python3 scripts/ci-summary.py                  # resumen de pruebas y cobertura tras un `mvn verify`
+```
+
+## Base de datos y contenido
+
+El CV vive en PostgreSQL (tabla `resume_version`, una fila por versión e idioma; la activa es la que sirve la API).
+El esquema lo crea Flyway al arrancar. **El contenido real no está en el repositorio**: está en `private/` (ignorado por git).
+
+```bash
+# Publicar (o actualizar) el CV: genera el SQL y lo aplica. Cada ejecución crea la versión siguiente.
+python3 scripts/make-seed.py private/content -o private/seed.sql
+psql "$DATABASE_URL" --single-transaction -f private/seed.sql
+
+# Volver a la versión anterior de un idioma
+python3 scripts/make-seed.py --rollback es | psql "$DATABASE_URL" --single-transaction
+```
+
+Configuración de la API en producción (variables de entorno): `QUARKUS_DATASOURCE_JDBC_URL`,
+`QUARKUS_DATASOURCE_USERNAME` y `QUARKUS_DATASOURCE_PASSWORD`. En desarrollo y en las pruebas Quarkus levanta un
+PostgreSQL con Testcontainers por su cuenta (hace falta Docker); en dev arranca vacío: aplica un seed (el tuyo o `db/sample`).
+
+### Despliegue en el NAS
+
+`deploy/docker-compose.yml` se pega tal cual en el editor de compose del NAS (sin `.env`): cambia las contraseñas, el
+puerto y `QUARKUS_HTTP_CORS_ORIGINS` (el dominio de la web; sin él el navegador no puede llamar a la API).
+Levanta `cv-api` + `cv-db` (la base de datos no publica puertos). El túnel de Cloudflare apunta al puerto publicado.
+
+```bash
+# Publicar el CV (desde un terminal con acceso a Docker del NAS; copia antes private/seed.sql allí)
+docker exec -i cv-db psql -U cv -d cv --single-transaction -v ON_ERROR_STOP=1 < seed.sql
+deploy/backup-db.sh                           # pg_dump comprimido en deploy/backups (conserva 14); programar con cron
 ```
 
 Swagger UI en `/swagger/` y el contrato en `/openapi.json` (con `Accept: application/json`; por defecto sirve YAML).
@@ -48,7 +84,7 @@ Umbrales (los aplica `scripts/ci-summary.py`): **90 % de líneas en total y 80 %
    el resultado de cada prueba, la cobertura por módulo y paquete, y las clases con líneas sin cubrir.
    Falla si hay pruebas rotas o la cobertura baja de los umbrales. Los informes quedan como artefacto.
 2. **Imagen Docker** (solo en push a `main` o a una etiqueta `v*`, y solo si el trabajo anterior pasó):
-   empaqueta **el mismo artefacto que se probó**, lo arranca y le pasa `scripts/smoke-test.sh`; si responde,
+   empaqueta **el mismo artefacto que se probó**, lo arranca junto a un PostgreSQL desechable con el CV de `db/sample` y le pasa `scripts/smoke-test.sh`; si responde,
    publica `linux/amd64` y `linux/arm64` en Docker Hub.
 
 Etiquetas de la imagen: `latest` (rama `main`), `sha-<corto>` y, al etiquetar `vX.Y.Z`, `X.Y.Z` y `X.Y`.

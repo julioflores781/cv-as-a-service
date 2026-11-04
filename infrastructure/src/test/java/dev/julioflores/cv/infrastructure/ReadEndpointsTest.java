@@ -18,39 +18,39 @@ class ReadEndpointsTest {
     void impact() {
         given().when().get("/api/v1/impact")
                 .then().statusCode(200)
-                .body("size()", equalTo(5))
-                .body("[0].value", equalTo("+5.000"));
+                .body("size()", equalTo(2))
+                .body("[0].value", equalTo("+10.000"));
     }
 
     @Test
     void impactInEnglish() {
         given().queryParam("lang", "en").when().get("/api/v1/impact")
                 .then().statusCode(200)
-                .body("[0].value", equalTo("5,000+"));
+                .body("[0].value", equalTo("10,000+"));
     }
 
     @Test
     void experienceListsNewestFirstWithPhases() {
         given().when().get("/api/v1/experience")
                 .then().statusCode(200)
-                .body("size()", equalTo(5))
-                .body("id", hasItems("sale-and-brick", "central-madeirense", "schneider-accounting"))
-                .body("[0].id", equalTo("sale-and-brick"))
-                .body("[0].period.start", equalTo("2017-10"))
+                .body("size()", equalTo(3))
+                .body("id", hasItems("acme-corp", "globex", "initech"))
+                .body("[0].id", equalTo("acme-corp"))
+                .body("[0].period.start", equalTo("2020-01"))
                 .body("[0].period.end", nullValue())
                 .body("[0].period.current", equalTo(true))
-                .body("[0].phases.size()", equalTo(3))
-                .body("[0].phases[1].title", containsString("xHIS"))
+                .body("[0].phases.size()", equalTo(2))
+                .body("[0].phases[1].title", containsString("microservicios"))
                 .body("[0].phases[1].client", notNullValue());
     }
 
     @Test
     void experienceById() {
-        given().when().get("/api/v1/experience/central-madeirense")
+        given().when().get("/api/v1/experience/globex")
                 .then().statusCode(200)
-                .body("company", equalTo("Central Madeirense"))
-                .body("period.start", equalTo("2014-03"))
-                .body("period.end", equalTo("2016-08"))
+                .body("company", equalTo("Globex"))
+                .body("period.start", equalTo("2017-03"))
+                .body("period.end", equalTo("2019-12"))
                 .body("period.current", equalTo(false));
     }
 
@@ -69,8 +69,8 @@ class ReadEndpointsTest {
     void skillsAllGroups() {
         given().when().get("/api/v1/skills")
                 .then().statusCode(200)
-                .body("size()", equalTo(6))
-                .body("key", hasItems("backend", "data", "health", "platform", "frontend", "methodology"));
+                .body("size()", equalTo(3))
+                .body("key", hasItems("backend", "data", "platform"));
     }
 
     @Test
@@ -93,15 +93,15 @@ class ReadEndpointsTest {
         given().when().get("/api/v1/education")
                 .then().statusCode(200)
                 .body("education.size()", equalTo(1))
-                .body("certificates[0].name", containsString("1Z0-047"))
-                .body("courses.size()", equalTo(3));
+                .body("certificates[0].name", containsString("EX-100"))
+                .body("courses.size()", equalTo(2));
     }
 
     @Test
     void contactNeverExposesPersonalData() {
         given().when().get("/api/v1/contact")
                 .then().statusCode(200)
-                .body("email", equalTo("julioflores781@gmail.com"))
+                .body("email", equalTo("ada@example.com"))
                 .body("profiles.network", hasItems("LinkedIn", "GitHub"))
                 .body("phone", nullValue())
                 .body("birthDate", nullValue());
@@ -112,10 +112,10 @@ class ReadEndpointsTest {
         given().when().get("/api/v1/resume")
                 .then().statusCode(200)
                 .body("language", equalTo("es"))
-                .body("profile.name", equalTo("Julio Flores"))
-                .body("experience.size()", equalTo(5))
-                .body("skills.size()", equalTo(6))
-                .body("education.courses.size()", equalTo(3))
+                .body("profile.name", equalTo("Ada Ejemplo"))
+                .body("experience.size()", equalTo(3))
+                .body("skills.size()", equalTo(3))
+                .body("education.courses.size()", equalTo(2))
                 .body("languages.language", hasItems("Español", "Inglés"));
     }
 

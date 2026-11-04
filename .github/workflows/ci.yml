@@ -116,14 +116,35 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # La API necesita PostgreSQL: se levanta uno desechable y se le aplica el CV ficticio de db/sample
+      # (el real nunca pasa por el pipeline). Flyway crea el esquema al arrancar la API; el seed se aplica después.
       - name: Probar el contenedor (smoke test)
         run: |
-          docker run -d --name cv-api -p 8080:8080 cv-api:ci
+          docker network create cvnet
+          docker run -d --name cv-db --network cvnet \
+            -e POSTGRES_DB=cv -e POSTGRES_USER=cv -e POSTGRES_PASSWORD=ci postgres:16-alpine
+          # -h 127.0.0.1: por TCP, como se conectará la API (por el socket responde también durante la inicialización).
+          until docker exec cv-db pg_isready -h 127.0.0.1 -U cv -d cv >/dev/null 2>&1; do sleep 1; done
+          docker run -d --name cv-api --network cvnet -p 8080:8080 \
+            -e QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://cv-db:5432/cv \
+            -e QUARKUS_DATASOURCE_USERNAME=cv -e QUARKUS_DATASOURCE_PASSWORD=ci cv-api:ci
+          # Flyway crea el esquema al arrancar la API; sin él no hay donde aplicar el seed.
+          ready=false
+          for i in $(seq 1 60); do
+            if docker exec cv-db psql -U cv -d cv -tAc "select 1 from resume_version limit 0" >/dev/null 2>&1; then ready=true; break; fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            echo "::error::La API no creó el esquema en 60 s"
+            docker logs cv-api
+            exit 1
+          fi
+          docker exec -i cv-db psql -U cv -d cv -v ON_ERROR_STOP=1 --single-transaction < db/sample/V1000__sample_resume.sql
           if ! scripts/smoke-test.sh http://localhost:8080; then
             docker logs cv-api
             exit 1
           fi
-          docker rm -f cv-api
+          docker rm -f cv-api cv-db
 
       # 2) Si el contenedor responde bien, se publica (amd64 + arm64) reutilizando la caché del paso anterior.
       - name: Publicar en Docker Hub

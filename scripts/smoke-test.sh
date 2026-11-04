@@ -2,6 +2,7 @@
 # Comprueba que una instancia en marcha responde lo esencial.
 # Uso: scripts/smoke-test.sh [URL_BASE]      (por defecto http://localhost:8080)
 # En el pipeline se ejecuta contra el contenedor ANTES de publicar la imagen.
+# Espera el CV ficticio de db/sample (Ada Ejemplo): aplícalo a la base antes de lanzarlo.
 set -euo pipefail
 
 BASE="${1:-http://localhost:8080}"
@@ -26,13 +27,31 @@ expect() {
   echo "✅ $url -> $code"
 }
 
-expect "/api/v1/profile"                         "Julio Flores"
+expect "/api/v1/profile"                         "Ada Ejemplo"
 expect "/api/v1/profile?lang=en"                 "backend focus"
-expect "/api/v1/experience"                      "sale-and-brick"
+expect "/api/v1/experience"                      "acme-corp"
 expect "/api/v1/skills?group=backend"            "Quarkus"
 expect "/api/v1/resume"                          '"experience"'
 expect "/api/v1/experience/nope"                 "EXPERIENCE_NOT_FOUND" 404
 expect "/api/v1/experience/nope?lang=en"         "Experience not found" 404
+
+# post URL CUERPO FRAGMENTO [ESTADO_HTTP]: igual que expect, pero con un POST text/plain.
+post() {
+  local url=$1 payload=$2 fragment=$3 status=${4:-200} out body code
+  out=$(curl -sS -w $'\n%{http_code}' -X POST -H 'Content-Type: text/plain' --data-binary "$payload" "$BASE$url") \
+    || fail "$url no responde"
+  code=${out##*$'\n'}
+  body=${out%$'\n'*}
+  [ "$code" = "$status" ] || fail "POST $url devolvió $code (esperado $status): $body"
+  grep -qF -- "$fragment" <<<"$body" || fail "POST $url no contiene '$fragment': $body"
+  echo "✅ POST $url -> $code"
+}
+
+ADT=$'MSH|^~\\&|HIS|HOSPITAL|LAB|HOSPITAL|20260101120000||ADT^A01^ADT_A01|MSG1|P|2.5.1\nPID|1||12345^^^HOSP^MR||Perez^Juan||19800101|M'
+post "/api/v1/hl7/translate"                     "$ADT"  '"familyName"'
+post "/api/v1/hl7/translate?format=fhir"         "$ADT"  '"resourceType": "Bundle"'
+post "/api/v1/hl7/translate"                     "hola"  "HL7_INVALID_MESSAGE" 422
+
 expect "/openapi.json"                           '"openapi"'
 expect "/swagger/"                               "OpenAPI UI"
 

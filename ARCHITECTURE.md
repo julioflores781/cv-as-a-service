@@ -1,6 +1,6 @@
 # Arquitectura: CV como API
 
-Un `resume.json` (ES/EN) es la fuente única. El dominio no conoce Quarkus, y cada salida (JSON, PDF, `llms.txt`) es un adaptador sobre el mismo modelo.
+El CV (ES/EN) vive en PostgreSQL como documento JSON versionado. El dominio no conoce Quarkus, y cada salida (JSON, PDF, `llms.txt`) es un adaptador sobre el mismo modelo.
 
 ## 1. Contrato de la API (`/api/v1`)
 
@@ -16,7 +16,7 @@ El idioma se elige con `?lang=es|en`. Si falta, se usa `Accept-Language`, y si t
 | GET | `/contact` | email y perfiles |
 | GET | `/resume` | CV completo en un solo documento (esquema propio; el formato JSON Resume estándar llegará como `?format=jsonresume` con las exportaciones) |
 | GET | `/resume.pdf` | PDF apto para ATS |
-| POST | `/hl7/translate?format=json\|fhir` | HL7 v2 (text/plain) → JSON o FHIR |
+| POST | `/hl7/translate?format=json\|fhir` | HL7 v2.5.1 (text/plain, `ADT^A01` y `ORU^R01`) → JSON o Bundle FHIR R4. **Implementado** |
 | POST | `/contact/messages` | guarda un mensaje, con límite de peticiones |
 | GET | `/status` | uptime real, versión y commit |
 | GET | `/health/live`, `/health/ready` | sondas de salud |
@@ -55,7 +55,7 @@ Convenciones:
                     │ Hl7Message · ContactMessage                          │
                     └──────────────┬──────────────────────┘
                                    ▼  puertos de salida
-   ResumeRepository · ContactMessageRepository · Hl7Parser · ResumeRenderer
+   ResumeRepository · ContactMessageRepository · Hl7Translator · ResumeRenderer
    Mailer · RateLimiter · StatusProbe · Clock
                                    ▼
                     ┌──────────── adaptadores de salida ──────────────┐
@@ -69,7 +69,7 @@ Decisiones de diseño:
 - **Maven multi-módulo:** `domain`, `application` e `infrastructure` (la app Quarkus). El compilador impide que el dominio importe Quarkus. Los módulos de librería necesitan Jandex para que Quarkus descubra sus beans.
 - **`domain` y `application` sin dependencias de framework.** Los casos de uso se conectan con `@Produces` en infraestructura.
 - **`ResumeRenderer` es un puerto con varios adaptadores:** JSON Resume, PDF y `llms.txt`.
-- **`Hl7Parser` es otro puerto,** con un adaptador HAPI v2 y, más adelante, otro HL7 → FHIR.
+- **`Hl7Translator` es otro puerto,** con un único adaptador HAPI (`adapter/out/hl7`). Lee el mensaje v2.5.1 a un modelo común (`ClinicalMessage`) del que salen la vista JSON y el Bundle FHIR, así el mapeo HL7 se escribe una sola vez. `Hl7Translation` lleva el documento ya serializado (JSON o FHIR): es una decisión consciente, porque un modelo clínico neutro en `application` añadiría tipos y mapeos sin lógica de negocio que lo justifique. El mapeo a FHIR es manual y acotado (PID→Patient, PV1→Encounter, OBX→Observation); el límite de 64 KB lo aplica el caso de uso y un tope duro de 128 KB el servidor.
 - **ArchUnit en CI** (API principal con pruebas JUnit normales; `archunit-junit5` 1.5.1 no funciona con JUnit 6 de Quarkus 3.40): el dominio no depende de nada, la aplicación solo del dominio, y los adaptadores no se importan entre sí.
 
 ## 3. Datos en PostgreSQL
@@ -78,7 +78,7 @@ Decisiones de diseño:
 - `contact_message(id, name, email, body, created_at, ip_hash)`: la IP se guarda hasheada, nunca en claro.
 - `page_view_daily(day, path, count)`: contadores agregados, sin rastreo individual.
 
-Flujo de importación: `content/resume.es.json` y `content/resume.en.json` en el repo → CI → comando `ImportResume` → nueva fila activa. El JSON del repo sigue siendo la fuente única.
+Flujo de publicación: el contenido real vive **fuera del repositorio** (`private/content/resume.{es,en}.json`). `scripts/make-seed.py` genera un SQL que desactiva la versión activa de cada idioma e inserta la siguiente; se aplica con `psql`. La API lee la versión activa por JDBC (`PostgresResumeRepository`) y la mantiene en memoria 5 minutos (`cv.resume.cache-ttl`); un CV no encontrado se recuerda solo 10 s. Decisión: documento JSONB versionado y no tablas normalizadas, porque nadie edita campos sueltos y así se reutiliza el mapper y se puede volver a una versión anterior (`make-seed.py --rollback <idioma>`). Si la base de datos falla al refrescar, se sigue sirviendo el último CV leído.
 
 ## 4. Pruebas
 
