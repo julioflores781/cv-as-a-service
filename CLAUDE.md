@@ -14,7 +14,7 @@ mvn -B verify                              # compila, ejecuta las pruebas y gene
 mvn quarkus:dev -pl infrastructure -am     # modo dev (http://localhost:8080, Swagger en /swagger/)
 python3 scripts/ci-summary.py              # resumen de pruebas y cobertura tras verify
 scripts/smoke-test.sh [URL]                # comprueba una instancia en marcha (con el CV de db/sample cargado)
-cd deploy && docker compose up -d          # API + Postgres para el NAS (ver README)
+deploy/docker-compose.yml                  # API + Postgres para el NAS, se pega en su editor de compose (ver README)
 ```
 Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config` local (ignorado por git) que evita su mirror corporativo.
 

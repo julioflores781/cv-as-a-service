@@ -6,7 +6,7 @@ Backend Quarkus con arquitectura hexagonal en tres módulos Maven. Ver [ARCHITEC
 
 ```
 cv/
-├── deploy/          docker-compose para el NAS (API + PostgreSQL + túnel opcional) y copia de seguridad
+├── deploy/          docker-compose para el NAS (API + PostgreSQL) y copia de seguridad
 ├── db/sample/       CV ficticio (JSON + seed SQL) para pruebas y arranque sin datos privados
 ├── private/         (ignorado por git) CV real y su seed: content/ · seed.sql
 ├── domain/          modelo de dominio puro (sin frameworks)
@@ -50,11 +50,13 @@ PostgreSQL con Testcontainers por su cuenta (hace falta Docker); en dev arranca 
 
 ### Despliegue en el NAS
 
+`deploy/docker-compose.yml` se pega tal cual en el editor de compose del NAS (sin `.env`): cambia las contraseñas, el
+puerto y `QUARKUS_HTTP_CORS_ORIGINS` (el dominio de la web; sin él el navegador no puede llamar a la API).
+Levanta `cv-api` + `cv-db` (la base de datos no publica puertos). El túnel de Cloudflare apunta al puerto publicado.
+
 ```bash
-cd deploy && cp .env.example .env            # poner POSTGRES_PASSWORD (y TUNNEL_TOKEN si usas Cloudflare Tunnel)
-docker compose up -d                          # API en 127.0.0.1:8080; la base de datos no publica puertos
-docker compose exec -T db psql -U cv -d cv --single-transaction -v ON_ERROR_STOP=1 < ../private/seed.sql
-docker compose --profile tunnel up -d         # opcional: expone la API por Cloudflare Tunnel
+# Publicar el CV (desde un terminal con acceso a Docker del NAS; copia antes private/seed.sql allí)
+docker exec -i cv-db psql -U cv -d cv --single-transaction -v ON_ERROR_STOP=1 < seed.sql
 deploy/backup-db.sh                           # pg_dump comprimido en deploy/backups (conserva 14); programar con cron
 ```
 

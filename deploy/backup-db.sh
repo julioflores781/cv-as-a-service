@@ -6,6 +6,6 @@ cd "$(dirname "$0")"
 dir="${1:-backups}"
 mkdir -p "$dir"
 file="$dir/cv-$(date +%Y%m%d-%H%M%S).sql.gz"
-docker compose exec -T db pg_dump -U cv -d cv --no-owner | gzip > "$file"
+docker exec cv-db pg_dump -U cv -d cv --no-owner | gzip > "$file"
 ls -1t "$dir"/cv-*.sql.gz | tail -n +15 | xargs -r rm --
 echo "✅ $file"
