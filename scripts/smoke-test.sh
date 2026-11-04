@@ -2,6 +2,7 @@
 # Comprueba que una instancia en marcha responde lo esencial.
 # Uso: scripts/smoke-test.sh [URL_BASE]      (por defecto http://localhost:8080)
 # En el pipeline se ejecuta contra el contenedor ANTES de publicar la imagen.
+# Espera el CV ficticio de db/sample (Ada Ejemplo): aplícalo a la base antes de lanzarlo.
 set -euo pipefail
 
 BASE="${1:-http://localhost:8080}"
@@ -26,9 +27,9 @@ expect() {
   echo "✅ $url -> $code"
 }
 
-expect "/api/v1/profile"                         "Julio Flores"
+expect "/api/v1/profile"                         "Ada Ejemplo"
 expect "/api/v1/profile?lang=en"                 "backend focus"
-expect "/api/v1/experience"                      "sale-and-brick"
+expect "/api/v1/experience"                      "acme-corp"
 expect "/api/v1/skills?group=backend"            "Quarkus"
 expect "/api/v1/resume"                          '"experience"'
 expect "/api/v1/experience/nope"                 "EXPERIENCE_NOT_FOUND" 404

@@ -14,7 +14,7 @@ class ProfileResourceTest {
     void returnsSpanishProfileByDefault() {
         given().when().get("/api/v1/profile")
                 .then().statusCode(200)
-                .body("name", equalTo("Julio Flores"))
+                .body("name", equalTo("Ada Ejemplo"))
                 .body("label", containsString("foco backend"));
     }
 

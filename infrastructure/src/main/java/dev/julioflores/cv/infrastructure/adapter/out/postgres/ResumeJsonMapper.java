@@ -1,4 +1,4 @@
-package dev.julioflores.cv.infrastructure.adapter.out.resumefile;
+package dev.julioflores.cv.infrastructure.adapter.out.postgres;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import dev.julioflores.cv.domain.Certificate;
@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.function.Function;
 import java.util.stream.StreamSupport;
 
-/** Traduce el esquema de resume.{lang}.json (basado en JSON Resume) al agregado de dominio. */
+/** Traduce el documento JSON del CV (esquema basado en JSON Resume, columna `content`) al agregado de dominio. */
 final class ResumeJsonMapper {
 
     private ResumeJsonMapper() {}

@@ -1,6 +1,6 @@
 # Arquitectura: CV como API
 
-Un `resume.json` (ES/EN) es la fuente única. El dominio no conoce Quarkus, y cada salida (JSON, PDF, `llms.txt`) es un adaptador sobre el mismo modelo.
+El CV (ES/EN) vive en PostgreSQL como documento JSON versionado. El dominio no conoce Quarkus, y cada salida (JSON, PDF, `llms.txt`) es un adaptador sobre el mismo modelo.
 
 ## 1. Contrato de la API (`/api/v1`)
 
@@ -78,7 +78,7 @@ Decisiones de diseño:
 - `contact_message(id, name, email, body, created_at, ip_hash)`: la IP se guarda hasheada, nunca en claro.
 - `page_view_daily(day, path, count)`: contadores agregados, sin rastreo individual.
 
-Flujo de importación: `content/resume.es.json` y `content/resume.en.json` en el repo → CI → comando `ImportResume` → nueva fila activa. El JSON del repo sigue siendo la fuente única.
+Flujo de publicación: el contenido real vive **fuera del repositorio** (`private/content/resume.{es,en}.json`). `scripts/make-seed.py` genera un SQL que desactiva la versión activa de cada idioma e inserta la siguiente; se aplica con `psql`. La API lee la versión activa por JDBC (`PostgresResumeRepository`) y la mantiene en memoria 5 minutos (`cv.resume.cache-ttl`); un CV no encontrado se recuerda solo 10 s. Decisión: documento JSONB versionado y no tablas normalizadas, porque nadie edita campos sueltos y así se reutiliza el mapper y se puede volver a una versión anterior (`make-seed.py --rollback <idioma>`). Si la base de datos falla al refrescar, se sigue sirviendo el último CV leído.
 
 ## 4. Pruebas
 

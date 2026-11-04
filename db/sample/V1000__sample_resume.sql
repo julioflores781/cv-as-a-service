@@ -1,0 +1,299 @@
+-- Generado por scripts/make-seed.py. No editar a mano.
+
+-- en
+UPDATE resume_version SET active = false WHERE lang = 'en' AND active;
+INSERT INTO resume_version (lang, version, content, active)
+SELECT 'en', COALESCE(MAX(version), 0) + 1, $resume$
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "meta": {
+    "lang": "en",
+    "version": "sample",
+    "lastModified": "2026-01-01"
+  },
+  "basics": {
+    "name": "Ada Ejemplo",
+    "label": "Senior Backend Engineer · backend focus",
+    "tagline": "Java/Quarkus · APIs and data",
+    "email": "ada@example.com",
+    "location": {
+      "city": "Ciudad Ejemplo",
+      "countryCode": "ES"
+    },
+    "summary": "Fictional profile for tests: designs APIs and data systems.",
+    "availability": "Available for testing.",
+    "profiles": [
+      {
+        "network": "LinkedIn",
+        "url": "https://www.linkedin.com/in/ada-ejemplo"
+      },
+      {
+        "network": "GitHub",
+        "url": "https://github.com/ada-ejemplo"
+      }
+    ]
+  },
+  "impact": [
+    {
+      "value": "10,000+",
+      "text": "daily requests on a sample API"
+    },
+    {
+      "value": "+3",
+      "text": "microservices delivered"
+    }
+  ],
+  "work": [
+    {
+      "id": "acme-corp",
+      "name": "Acme Corp",
+      "position": "Backend Developer",
+      "startDate": "2020-01",
+      "summary": "Current stage at a fictional company.",
+      "phases": [
+        {
+          "title": "Support and analysis",
+          "client": "Cliente Uno"
+        },
+        {
+          "title": "Microservices platform",
+          "client": "Cliente Dos"
+        }
+      ],
+      "highlights": [
+        "REST API design with Quarkus.",
+        "Automated tests in CI."
+      ]
+    },
+    {
+      "id": "globex",
+      "name": "Globex",
+      "position": "Developer",
+      "startDate": "2017-03",
+      "endDate": "2019-12",
+      "summary": "Middle stage.",
+      "highlights": [
+        "Data migration."
+      ]
+    },
+    {
+      "id": "initech",
+      "name": "Initech",
+      "position": "Junior Developer",
+      "startDate": "2014-06",
+      "endDate": "2017-02",
+      "summary": "First stage."
+    }
+  ],
+  "education": [
+    {
+      "institution": "Universidad Ejemplo",
+      "studyType": "Degree",
+      "area": "Computer Science"
+    }
+  ],
+  "certificates": [
+    {
+      "name": "Certified Example (EX-100)",
+      "issuer": "Example Institute"
+    }
+  ],
+  "courses": [
+    {
+      "name": "Quarkus",
+      "issuer": "Example Academy"
+    },
+    {
+      "name": "PostgreSQL",
+      "issuer": "Example Academy"
+    }
+  ],
+  "skills": [
+    {
+      "group": "backend",
+      "name": "Backend",
+      "keywords": [
+        "Java 17+",
+        "Quarkus",
+        "Spring Boot"
+      ]
+    },
+    {
+      "group": "data",
+      "name": "Data",
+      "keywords": [
+        "PostgreSQL",
+        "Flyway"
+      ]
+    },
+    {
+      "group": "platform",
+      "name": "Platform",
+      "keywords": [
+        "Docker",
+        "GitHub Actions"
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "language": "Spanish",
+      "fluency": "Native"
+    },
+    {
+      "language": "English",
+      "fluency": "Basic"
+    }
+  ]
+}
+$resume$::jsonb, true
+FROM resume_version WHERE lang = 'en';
+
+-- es
+UPDATE resume_version SET active = false WHERE lang = 'es' AND active;
+INSERT INTO resume_version (lang, version, content, active)
+SELECT 'es', COALESCE(MAX(version), 0) + 1, $resume$
+{
+  "$schema": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/schema.json",
+  "meta": {
+    "lang": "es",
+    "version": "sample",
+    "lastModified": "2026-01-01"
+  },
+  "basics": {
+    "name": "Ada Ejemplo",
+    "label": "Senior Backend Engineer · foco backend",
+    "tagline": "Java/Quarkus · APIs y datos",
+    "email": "ada@example.com",
+    "location": {
+      "city": "Ciudad Ejemplo",
+      "countryCode": "ES"
+    },
+    "summary": "Perfil ficticio para las pruebas: diseña APIs y sistemas de datos.",
+    "availability": "Disponible para pruebas.",
+    "profiles": [
+      {
+        "network": "LinkedIn",
+        "url": "https://www.linkedin.com/in/ada-ejemplo"
+      },
+      {
+        "network": "GitHub",
+        "url": "https://github.com/ada-ejemplo"
+      }
+    ]
+  },
+  "impact": [
+    {
+      "value": "+10.000",
+      "text": "peticiones diarias en una API de ejemplo"
+    },
+    {
+      "value": "+3",
+      "text": "microservicios entregados"
+    }
+  ],
+  "work": [
+    {
+      "id": "acme-corp",
+      "name": "Acme Corp",
+      "position": "Backend Developer",
+      "startDate": "2020-01",
+      "summary": "Etapa actual en una empresa ficticia.",
+      "phases": [
+        {
+          "title": "Soporte y análisis",
+          "client": "Cliente Uno"
+        },
+        {
+          "title": "Plataforma de microservicios",
+          "client": "Cliente Dos"
+        }
+      ],
+      "highlights": [
+        "Diseño de APIs REST con Quarkus.",
+        "Pruebas automatizadas en CI."
+      ]
+    },
+    {
+      "id": "globex",
+      "name": "Globex",
+      "position": "Developer",
+      "startDate": "2017-03",
+      "endDate": "2019-12",
+      "summary": "Etapa intermedia.",
+      "highlights": [
+        "Migración de datos."
+      ]
+    },
+    {
+      "id": "initech",
+      "name": "Initech",
+      "position": "Junior Developer",
+      "startDate": "2014-06",
+      "endDate": "2017-02",
+      "summary": "Primera etapa."
+    }
+  ],
+  "education": [
+    {
+      "institution": "Universidad Ejemplo",
+      "studyType": "Grado",
+      "area": "Informática"
+    }
+  ],
+  "certificates": [
+    {
+      "name": "Certified Example (EX-100)",
+      "issuer": "Example Institute"
+    }
+  ],
+  "courses": [
+    {
+      "name": "Quarkus",
+      "issuer": "Example Academy"
+    },
+    {
+      "name": "PostgreSQL",
+      "issuer": "Example Academy"
+    }
+  ],
+  "skills": [
+    {
+      "group": "backend",
+      "name": "Backend",
+      "keywords": [
+        "Java 17+",
+        "Quarkus",
+        "Spring Boot"
+      ]
+    },
+    {
+      "group": "data",
+      "name": "Datos",
+      "keywords": [
+        "PostgreSQL",
+        "Flyway"
+      ]
+    },
+    {
+      "group": "platform",
+      "name": "Plataforma",
+      "keywords": [
+        "Docker",
+        "GitHub Actions"
+      ]
+    }
+  ],
+  "languages": [
+    {
+      "language": "Español",
+      "fluency": "Nativo"
+    },
+    {
+      "language": "Inglés",
+      "fluency": "Básico"
+    }
+  ]
+}
+$resume$::jsonb, true
+FROM resume_version WHERE lang = 'es';

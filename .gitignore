@@ -5,3 +5,5 @@ target/
 .DS_Store
 .env
 .mvn/maven.config
+private/
+backups/
