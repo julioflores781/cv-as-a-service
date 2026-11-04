@@ -6,3 +6,4 @@ target/
 .env
 .mvn/maven.config
 private/
+backups/

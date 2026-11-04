@@ -1,0 +1,51 @@
+# API + PostgreSQL para el NAS.  Uso:  cp .env.example .env  (y poner una contraseña)  &&  docker compose up -d
+# Publicar el CV:  docker compose exec -T db psql -U cv -d cv --single-transaction -v ON_ERROR_STOP=1 < ../private/seed.sql
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: cv
+      POSTGRES_USER: cv
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+    volumes:
+      - cv-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cv -d cv"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    image: julioflores781/cv-api:${CV_API_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      QUARKUS_DATASOURCE_JDBC_URL: jdbc:postgresql://db:5432/cv
+      QUARKUS_DATASOURCE_USERNAME: cv
+      QUARKUS_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+    # Solo el propio NAS (y el túnel de Cloudflare) llegan a la API; la base de datos no publica ningún puerto.
+    ports:
+      - "127.0.0.1:${CV_API_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready || exit 1"]
+      interval: 15s
+      timeout: 3s
+      retries: 5
+      start_period: 30s
+
+  # Opcional:  docker compose --profile tunnel up -d   (token del túnel creado en Cloudflare Zero Trust)
+  cloudflared:
+    profiles: ["tunnel"]
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - api
+
+volumes:
+  cv-db:

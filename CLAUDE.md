@@ -13,7 +13,8 @@ Diseño y decisiones: [ARCHITECTURE.md](ARCHITECTURE.md). Comandos, cobertura y 
 mvn -B verify                              # compila, ejecuta las pruebas y genera la cobertura
 mvn quarkus:dev -pl infrastructure -am     # modo dev (http://localhost:8080, Swagger en /swagger/)
 python3 scripts/ci-summary.py              # resumen de pruebas y cobertura tras verify
-scripts/smoke-test.sh [URL]                # comprueba una instancia en marcha
+scripts/smoke-test.sh [URL]                # comprueba una instancia en marcha (con el CV de db/sample cargado)
+cd deploy && docker compose up -d          # API + Postgres para el NAS (ver README)
 ```
 Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config` local (ignorado por git) que evita su mirror corporativo.
 
@@ -34,7 +35,7 @@ Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config`
 - `quarkus.swagger-ui.path` lleva barra inicial (`/swagger`); sin ella Quarkus lo cuelga de `/q/`.
 - Las pruebas necesitan Docker (Testcontainers levanta PostgreSQL). `db/sample/V1000__sample_resume.sql` se **genera**: si editas `db/sample/*.json`, regénerala con `scripts/make-seed.py`.
 - Flyway va con `placeholder-replacement=false` (el JSON del CV puede llevar `${`) y el seed usa `$resume$` seguido de salto de línea (`$resume${` sería un marcador).
-- **No fusionar a `main` hasta adaptar el CI**: el smoke test de la imagen arranca el contenedor sin base de datos y fallaría.
+- El smoke test (`scripts/smoke-test.sh`) espera el CV ficticio de `db/sample` (Ada Ejemplo): el CI levanta un Postgres, aplica `V1000__sample_resume.sql` y luego lo ejecuta. Si cambias el sample, ajusta los fragmentos esperados.
 - Las pruebas de adaptadores de `infrastructure` deben ser `@QuarkusTest` (con `@Inject`): `quarkus-jacoco` solo mide lo que se carga dentro de Quarkus, y una prueba JUnit plana no suma cobertura.
 - HL7: solo v2.5.1 (`hapi-structures-v251`) y los tipos `ADT^A01`/`ORU^R01`; otros dan `422 HL7_UNSUPPORTED_MESSAGE`. Un OBX sin su OBR no encaja en la estructura ORU y se descarta sin error. El cuerpo nunca se registra en logs. Las versiones de HAPI están en el `pom` raíz.
 - La cobertura de `infrastructure` se limita a sus propias clases (`quarkus.jacoco.includes`); si no, `domain`/`application` salen con 0 %.
