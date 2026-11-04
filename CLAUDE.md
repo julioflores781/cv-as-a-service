@@ -43,14 +43,14 @@ Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config`
 ## Hecho
 Dominio completo, 8 casos de uso, endpoints `GET /api/v1/{profile,impact,experience[/{id}],skills,education,contact,resume}`,
 **demo HL7** `POST /api/v1/hl7/translate?format=json|fhir` (HAPI; ADT^A01 y ORU^R01 en v2.5.1; mapeo manual a FHIR R4),
-errores RFC 7807 con `code` estable y textos ES/EN, Swagger completo, 122 pruebas (95,2 % de cobertura de líneas), pipeline
+errores RFC 7807 con `code` estable y textos ES/EN, Swagger completo, 127 pruebas (≈95 % de cobertura de líneas), pipeline
 de GitHub Actions (pruebas + cobertura → imagen Docker con smoke test, amd64 y arm64).
 
 ## Siguiente (orden recomendado)
 1. **ADRs** cortos en `docs/adr/` (multi-módulo vs paquetes, Quarkus vs NestJS, errores con código estable, alcance del i18n).
 2. **Exportaciones:** `/llms.txt`, `/resume.pdf` (openhtmltopdf desde Qute), `/resume?format=jsonresume`, `ETag`.
 3. **Front Next.js** estático (ES por defecto, SEO, lee `/api/v1/resume` en el build).
-4. **PostgreSQL + Flyway** (`resume_version` jsonb, `contact_message`, `page_view_daily`), `/status`, docker-compose para el NAS, Cloudflare Tunnel.
+4. `contact_message` y `page_view_daily`, `/status`, Cloudflare Tunnel (Postgres, Flyway y docker-compose ya están).
 
 Pendiente menor: los ids de experiencia distinguen mayúsculas y los grupos de skills no; unificar en una línea, sin tipos nuevos.
 Pendiente del contenido (de su dueño): fechas de las fases dentro de Sale & Brick y confirmar las cifras de impacto.

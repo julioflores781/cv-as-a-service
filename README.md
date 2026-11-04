@@ -42,6 +42,9 @@ El esquema lo crea Flyway al arrancar. **El contenido real no está en el reposi
 # Publicar (o actualizar) el CV: genera el SQL y lo aplica. Cada ejecución crea la versión siguiente.
 python3 scripts/make-seed.py private/content -o private/seed.sql
 psql "$DATABASE_URL" --single-transaction -f private/seed.sql
+
+# Volver a la versión anterior de un idioma
+python3 scripts/make-seed.py --rollback es | psql "$DATABASE_URL" --single-transaction
 ```
 
 Configuración de la API en producción (variables de entorno): `QUARKUS_DATASOURCE_JDBC_URL`,

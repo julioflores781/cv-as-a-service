@@ -6,57 +6,83 @@ import dev.julioflores.cv.domain.Language;
 import dev.julioflores.cv.domain.Resume;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import javax.sql.DataSource;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 
 /**
  * Lee la versión activa del CV de cada idioma desde PostgreSQL (tabla {@code resume_version}).
  * El CV cambia pocas veces al año, así que cada idioma se mantiene en memoria un rato
  * ({@code cv.resume.cache-ttl}) y una publicación nueva se ve como mucho tras ese tiempo.
+ * Si la base de datos falla al refrescar, se sigue sirviendo el último CV leído.
  */
 @ApplicationScoped
 public class PostgresResumeRepository implements ResumeRepository {
 
+    private static final Logger LOG = Logger.getLogger(PostgresResumeRepository.class);
     private static final String ACTIVE_CONTENT = "SELECT content::text FROM resume_version WHERE lang = ? AND active";
+    /** Un CV aún sin publicar se recuerda poco: aparece enseguida al cargarlo, sin una consulta por petición. */
+    private static final long NOT_FOUND_TTL_NANOS = Duration.ofSeconds(10).toNanos();
 
-    private record Cached(Optional<Resume> resume, long loadedAtNanos) {}
+    private record Cached(Optional<Resume> resume, long expiresAtNanos) {
+        boolean isFresh() {
+            return System.nanoTime() - expiresAtNanos < 0;
+        }
+    }
 
     private final DataSource dataSource;
     private final ObjectMapper mapper;
     private final long ttlNanos;
     private final Map<Language, Cached> cache = new ConcurrentHashMap<>();
+    private final Map<Language, Object> locks = new EnumMap<>(Language.class);
 
     public PostgresResumeRepository(
             DataSource dataSource, ObjectMapper mapper, @ConfigProperty(name = "cv.resume.cache-ttl") Duration ttl) {
         this.dataSource = dataSource;
         this.mapper = mapper;
         this.ttlNanos = ttl.toNanos();
+        for (Language language : Language.values()) {
+            locks.put(language, new Object());
+        }
     }
 
     @Override
     public Optional<Resume> findActive(Language language) {
-        long now = System.nanoTime();
         Cached cached = cache.get(language);
-        if (cached != null && now - cached.loadedAtNanos() < ttlNanos) {
+        if (cached != null && cached.isFresh()) {
             return cached.resume();
         }
-        Optional<Resume> loaded = load(language);
-        // Solo se recuerda lo encontrado: un CV que aún no se ha publicado debe aparecer en cuanto se cargue.
-        if (loaded.isPresent()) {
-            cache.put(language, new Cached(loaded, now));
-        } else {
-            cache.remove(language);
+        // Un candado por idioma: tras caducar, una sola petición consulta la base de datos y el resto espera su resultado.
+        synchronized (locks.get(language)) {
+            cached = cache.get(language);
+            if (cached == null || !cached.isFresh()) {
+                cached = refresh(language, cached);
+                cache.put(language, cached);
+            }
+            return cached.resume();
         }
-        return loaded;
+    }
+
+    private Cached refresh(Language language, Cached stale) {
+        try {
+            Optional<Resume> loaded = load(language);
+            return new Cached(loaded, System.nanoTime() + (loaded.isPresent() ? ttlNanos : NOT_FOUND_TTL_NANOS));
+        } catch (RuntimeException e) {
+            if (stale == null) {
+                throw e;
+            }
+            LOG.warnf(e, "Cannot refresh the '%s' resume; serving the last one read", language.tag());
+            return new Cached(stale.resume(), System.nanoTime() + ttlNanos);
+        }
     }
 
     private Optional<Resume> load(Language language) {
@@ -69,10 +95,8 @@ public class PostgresResumeRepository implements ResumeRepository {
                 }
                 return Optional.of(ResumeJsonMapper.toResume(language, mapper.readTree(rows.getString(1))));
             }
-        } catch (SQLException e) {
+        } catch (SQLException | IOException e) {
             throw new IllegalStateException("Cannot read the active resume for '" + language.tag() + "'", e);
-        } catch (IOException e) {
-            throw new UncheckedIOException("The stored resume for '" + language.tag() + "' is not valid JSON", e);
         }
     }
 }
