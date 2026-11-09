@@ -1,0 +1,21 @@
+{
+  "core": { "name": "Dominio", "description": "Las reglas del negocio, sin saber qué hay fuera." },
+  "ports": [
+    {
+      "id": "database",
+      "name": "Base de datos",
+      "description": "Dónde se guardan los datos.",
+      "adapters": [
+        { "id": "postgresql", "name": "PostgreSQL", "status": "in-this-api" },
+        { "id": "mongodb", "name": "MongoDB", "status": "production", "note": "Nota de ejemplo" }
+      ]
+    },
+    {
+      "id": "queue",
+      "name": "Colas",
+      "adapters": [
+        { "id": "kafka", "name": "Kafka", "status": "experiment" }
+      ]
+    }
+  ]
+}

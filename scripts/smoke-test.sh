@@ -54,6 +54,9 @@ post "/api/v1/hl7/translate"                     "hola"  "HL7_INVALID_MESSAGE" 4
 # Contacto: solo el caso inválido, para no dejar mensajes en la base de datos.
 post "/api/v1/contact/messages"                  '{"name":"","email":"x","message":"y"}' "CONTACT_INVALID" 400 application/json
 
+expect "/api/v1/services"                        "Servicio de ejemplo"
+expect "/api/v1/projects?lang=en"                "Sample anonymous project"
+expect "/api/v1/architecture"                    "PostgreSQL"
 expect "/openapi.json"                           '"openapi"'
 expect "/swagger/"                               "OpenAPI UI"
 

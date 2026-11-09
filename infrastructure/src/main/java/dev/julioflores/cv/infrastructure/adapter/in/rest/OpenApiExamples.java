@@ -124,6 +124,106 @@ final class OpenApiExamples {
               "languages": [ { "language": "Español", "fluency": "Nativo" }, { "language": "Inglés", "fluency": "Básico" } ]
             }""";
 
+    static final String SERVICES_ES = """
+            [
+              {
+                "id": "api-backend",
+                "title": "APIs y backend",
+                "summary": "Servicios en Quarkus o NestJS, bien documentados y listos para producción.",
+                "price": { "from": 1500, "currency": "EUR" }
+              },
+              {
+                "id": "modernizacion",
+                "title": "Modernización de sistemas",
+                "summary": "Llevar un sistema antiguo a una arquitectura actual sin parar el negocio.",
+                "price": null
+              }
+            ]""";
+
+    static final String SERVICES_EN = """
+            [
+              {
+                "id": "api-backend",
+                "title": "APIs and backend",
+                "summary": "Quarkus or NestJS services, well documented and production-ready.",
+                "price": { "from": 1500, "currency": "EUR" }
+              },
+              {
+                "id": "modernizacion",
+                "title": "System modernization",
+                "summary": "Move a legacy system to a current architecture without stopping the business.",
+                "price": null
+              }
+            ]""";
+
+    static final String PROJECTS_ES = """
+            [
+              {
+                "id": "turnos-clinica",
+                "title": "Plataforma de turnos médicos",
+                "summary": "Backend y web para que los pacientes reserven turnos y la clínica gestione su agenda.",
+                "relation": "employer",
+                "role": "Backend y web",
+                "disclosure": "anonymous",
+                "client": null,
+                "clientLabel": "clínica privada",
+                "period": { "start": "2021-03", "end": "2022-09", "current": false },
+                "stack": ["Java", "Quarkus", "PostgreSQL", "React"],
+                "highlights": ["Reservas sin solapamientos", "Avisos a los pacientes"],
+                "links": []
+              }
+            ]""";
+
+    static final String PROJECTS_EN = """
+            [
+              {
+                "id": "turnos-clinica",
+                "title": "Medical appointments platform",
+                "summary": "Backend and web so patients can book appointments and the clinic can manage its agenda.",
+                "relation": "employer",
+                "role": "Backend and web",
+                "disclosure": "anonymous",
+                "client": null,
+                "clientLabel": "private clinic",
+                "period": { "start": "2021-03", "end": "2022-09", "current": false },
+                "stack": ["Java", "Quarkus", "PostgreSQL", "React"],
+                "highlights": ["Bookings without overlaps", "Patient reminders"],
+                "links": []
+              }
+            ]""";
+
+    static final String ARCHITECTURE_ES = """
+            {
+              "core": { "name": "Dominio", "description": "Las reglas del negocio, sin saber qué base de datos ni qué cola hay fuera." },
+              "ports": [
+                {
+                  "id": "database",
+                  "name": "Base de datos",
+                  "description": "Dónde se guardan los datos.",
+                  "adapters": [
+                    { "id": "postgresql", "name": "PostgreSQL", "status": "in-this-api", "note": null },
+                    { "id": "mongodb", "name": "MongoDB", "status": "production", "note": null }
+                  ]
+                }
+              ]
+            }""";
+
+    static final String ARCHITECTURE_EN = """
+            {
+              "core": { "name": "Domain", "description": "The business rules, unaware of which database or queue sits outside." },
+              "ports": [
+                {
+                  "id": "database",
+                  "name": "Database",
+                  "description": "Where the data is stored.",
+                  "adapters": [
+                    { "id": "postgresql", "name": "PostgreSQL", "status": "in-this-api", "note": null },
+                    { "id": "mongodb", "name": "MongoDB", "status": "production", "note": null }
+                  ]
+                }
+              ]
+            }""";
+
     static final String PROBLEM_RESUME_NOT_FOUND = """
             {
               "type": "about:blank",

@@ -58,6 +58,25 @@ primero y consulta `getUpdates`). Sin token o sin chat no se avisa, pero los men
 remitente y hora (`cv.contact.rate-limit.max` / `.window`), en memoria: vale para una sola instancia. Para leer los mensajes:
 `SELECT created_at, name, email, body FROM contact_message ORDER BY created_at DESC;`
 
+### Servicios, proyectos y arquitectura (contenido editable)
+
+Además del CV, la web lee tres contenidos de la base de datos (tabla `content_version`, mismo esquema versionado):
+`GET /api/v1/services` (con precio «desde» opcional), `/projects` y `/architecture` (el hexágono: núcleo, puertos y adaptadores).
+Se publican igual que el CV, con un archivo `<tipo>.<idioma>.json` en `private/content` (tipos: `services`, `projects`,
+`architecture`); solo se publican los que haya en el directorio. Estructura: mira `db/sample`.
+
+```bash
+python3 scripts/make-seed.py private/content -o private/seed.sql && psql "$DATABASE_URL" --single-transaction -f private/seed.sql
+python3 scripts/make-seed.py --rollback es --kind services | psql "$DATABASE_URL" --single-transaction   # volver atrás
+```
+
+- Cambiar un precio, quitar un adaptador del hexágono o añadir un proyecto es publicar una versión nueva: no se toca código
+  ni la web (solo hay que regenerarla; la API tarda hasta 5 minutos en verlo, `cv.content.cache-ttl`).
+- Sin nada publicado, los endpoints responden 200 con lista vacía (o sin puertos) y la web omite la sección.
+- **Clientes:** un proyecto `anonymous` solo describe al cliente en `clientLabel`; el script **rechaza** que traiga `client`,
+  así su nombre real nunca llega a la base de datos. Un proyecto `public` de una empresa (`employer`) debe traer `client`; uno propio (`own`) no necesita cliente.
+- Cada adaptador del hexágono lleva un `status` honesto: `in-this-api` (implementado aquí), `production` o `experiment`.
+
 ### Despliegue en el NAS
 
 `deploy/docker-compose.yml` se pega tal cual en el editor de compose del NAS (sin `.env`): cambia las contraseñas, el
