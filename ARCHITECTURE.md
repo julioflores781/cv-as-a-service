@@ -17,7 +17,7 @@ El idioma se elige con `?lang=es|en`. Si falta, se usa `Accept-Language`, y si t
 | GET | `/resume` | CV completo en un solo documento (esquema propio; el formato JSON Resume estándar llegará como `?format=jsonresume` con las exportaciones) |
 | GET | `/resume.pdf` | PDF apto para ATS |
 | POST | `/hl7/translate?format=json\|fhir` | HL7 v2.5.1 (text/plain, `ADT^A01` y `ORU^R01`) → JSON o Bundle FHIR R4. **Implementado** |
-| POST | `/contact/messages` | guarda un mensaje, con límite de peticiones |
+| POST | `/contact/messages` | guarda un mensaje (JSON `name`, `email`, `message` y el campo trampa `website`) y avisa por Telegram; límite de 5 por remitente y hora. **Implementado** |
 | GET | `/status` | uptime real, versión y commit |
 | GET | `/health/live`, `/health/ready` | sondas de salud |
 
@@ -56,12 +56,13 @@ Convenciones:
                     └──────────────┬──────────────────────┘
                                    ▼  puertos de salida
    ResumeRepository · ContactMessageRepository · Hl7Translator · ResumeRenderer
-   Mailer · RateLimiter · StatusProbe · Clock
+   ContactNotifier · RateLimiter · StatusProbe · Clock
                                    ▼
                     ┌──────────── adaptadores de salida ──────────────┐
                     │ Postgres (Panache + Flyway) · HAPI HL7/FHIR     │
                     │ PDF (Qute → HTML → PDF) · llms.txt (Qute)       │
-                    │ Quarkus Mailer · Uptime Kuma (estado)           │
+                    │ Telegram (aviso) · RateLimiter en memoria       │
+                    │ Uptime Kuma (estado)                            │
                     └─────────────────────────────────────────────────┘
 ```
 

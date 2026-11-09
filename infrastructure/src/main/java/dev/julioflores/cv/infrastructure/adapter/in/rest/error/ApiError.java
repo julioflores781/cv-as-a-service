@@ -17,6 +17,8 @@ public enum ApiError {
     HL7_UNSUPPORTED_FORMAT(400),
     HL7_INVALID_MESSAGE(422),
     HL7_UNSUPPORTED_MESSAGE(422),
+    CONTACT_INVALID(400),
+    CONTACT_RATE_LIMITED(429),
     // Errores de transporte, sin ErrorCode de negocio
     BAD_REQUEST(400),
     NOT_FOUND(404),

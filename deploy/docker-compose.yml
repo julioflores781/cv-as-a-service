@@ -36,6 +36,11 @@ services:
       QUARKUS_DATASOURCE_PASSWORD: CAMBIA-esta-contrasena # la misma que POSTGRES_PASSWORD
       # Orígenes de la web que llamará a la API desde el navegador (separados por coma). Sin esto el CORS bloquea todo.
       QUARKUS_HTTP_CORS_ORIGINS: https://CAMBIA.tu-dominio.com
+      # Formulario de contacto. La sal hashea la IP del remitente: pon una cadena larga y secreta propia.
+      CV_CONTACT_IP_SALT: CAMBIA-por-una-cadena-larga-y-secreta
+      # Aviso por Telegram de cada mensaje nuevo (bot de @BotFather y el id de tu chat). Vacío = sin aviso, los mensajes se guardan igual.
+      CV_CONTACT_TELEGRAM_BOT_TOKEN: ""
+      CV_CONTACT_TELEGRAM_CHAT_ID: ""
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8080/q/health/ready || exit 1"]
       interval: 30s
