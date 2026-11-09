@@ -43,14 +43,16 @@ Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config`
 ## Hecho
 Dominio completo, 8 casos de uso, endpoints `GET /api/v1/{profile,impact,experience[/{id}],skills,education,contact,resume}`,
 **demo HL7** `POST /api/v1/hl7/translate?format=json|fhir` (HAPI; ADT^A01 y ORU^R01 en v2.5.1; mapeo manual a FHIR R4),
-errores RFC 7807 con `code` estable y textos ES/EN, Swagger completo, 127 pruebas (≈95 % de cobertura de líneas), pipeline
+errores RFC 7807 con `code` estable y textos ES/EN, Swagger completo, 160 pruebas (≈96 % de cobertura de líneas), pipeline
 de GitHub Actions (pruebas + cobertura → imagen Docker con smoke test, amd64 y arm64).
+**Contacto** `POST /api/v1/contact/messages` (rama `feat/contact-messages`): valida, limita por remitente (hash de la IP con sal), guarda en `contact_message` y avisa por Telegram (`ContactNotifier`); campo trampa `website` para bots. Variables `CV_CONTACT_*` (ver README).
 
 ## Siguiente (orden recomendado)
 1. **ADRs** cortos en `docs/adr/` (multi-módulo vs paquetes, Quarkus vs NestJS, errores con código estable, alcance del i18n).
 2. **Exportaciones:** `/llms.txt`, `/resume.pdf` (openhtmltopdf desde Qute), `/resume?format=jsonresume`, `ETag`.
 3. **Front Next.js** estático (ES por defecto, SEO, lee `/api/v1/resume` en el build).
-4. `contact_message` y `page_view_daily`, `/status`, Cloudflare Tunnel (Postgres, Flyway y docker-compose ya están).
+4. `page_view_daily`, `/status`, Cloudflare Tunnel (Postgres, Flyway y docker-compose ya están).
+5. `GET /api/v1/{services,projects,architecture}` desde la base de datos (JSONB versionado como el CV) para la web; los proyectos llevan `disclosure` (`public`/`anonymous`) y el nombre del cliente no sale si es anónimo.
 
 Pendiente menor: los ids de experiencia distinguen mayúsculas y los grupos de skills no; unificar en una línea, sin tipos nuevos.
 Pendiente del contenido (de su dueño): fechas de las fases dentro de Sale & Brick y confirmar las cifras de impacto.

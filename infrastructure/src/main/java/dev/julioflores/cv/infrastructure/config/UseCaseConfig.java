@@ -7,8 +7,12 @@ import dev.julioflores.cv.application.port.in.GetImpactUseCase;
 import dev.julioflores.cv.application.port.in.GetProfileUseCase;
 import dev.julioflores.cv.application.port.in.GetResumeUseCase;
 import dev.julioflores.cv.application.port.in.GetSkillsUseCase;
+import dev.julioflores.cv.application.port.in.SubmitContactMessageUseCase;
 import dev.julioflores.cv.application.port.in.TranslateHl7UseCase;
+import dev.julioflores.cv.application.port.out.ContactMessageRepository;
+import dev.julioflores.cv.application.port.out.ContactNotifier;
 import dev.julioflores.cv.application.port.out.Hl7Translator;
+import dev.julioflores.cv.application.port.out.RateLimiter;
 import dev.julioflores.cv.application.port.out.ResumeRepository;
 import dev.julioflores.cv.application.service.GetContactService;
 import dev.julioflores.cv.application.service.GetEducationService;
@@ -17,6 +21,7 @@ import dev.julioflores.cv.application.service.GetImpactService;
 import dev.julioflores.cv.application.service.GetProfileService;
 import dev.julioflores.cv.application.service.GetResumeService;
 import dev.julioflores.cv.application.service.GetSkillsService;
+import dev.julioflores.cv.application.service.SubmitContactMessageService;
 import dev.julioflores.cv.application.service.TranslateHl7Service;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -71,5 +76,12 @@ public class UseCaseConfig {
     @ApplicationScoped
     TranslateHl7UseCase translateHl7(Hl7Translator translator) {
         return new TranslateHl7Service(translator);
+    }
+
+    @Produces
+    @ApplicationScoped
+    SubmitContactMessageUseCase submitContactMessage(
+            ContactMessageRepository messages, ContactNotifier notifier, RateLimiter rateLimiter) {
+        return new SubmitContactMessageService(messages, notifier, rateLimiter);
     }
 }

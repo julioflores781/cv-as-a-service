@@ -51,6 +51,13 @@ Configuración de la API en producción (variables de entorno): `QUARKUS_DATASOU
 `QUARKUS_DATASOURCE_USERNAME` y `QUARKUS_DATASOURCE_PASSWORD`. En desarrollo y en las pruebas Quarkus levanta un
 PostgreSQL con Testcontainers por su cuenta (hace falta Docker); en dev arranca vacío: aplica un seed (el tuyo o `db/sample`).
 
+**Formulario de contacto** (`POST /api/v1/contact/messages`): guarda el mensaje en `contact_message` y avisa por Telegram.
+Variables: `CV_CONTACT_IP_SALT` (cadena larga y secreta con la que se hashea la IP; la IP nunca se guarda en claro),
+`CV_CONTACT_TELEGRAM_BOT_TOKEN` (bot creado con @BotFather) y `CV_CONTACT_TELEGRAM_CHAT_ID` (tu chat con el bot; escríbele
+primero y consulta `getUpdates`). Sin token o sin chat no se avisa, pero los mensajes se guardan igual. Límite: 5 mensajes por
+remitente y hora (`cv.contact.rate-limit.max` / `.window`), en memoria: vale para una sola instancia. Para leer los mensajes:
+`SELECT created_at, name, email, body FROM contact_message ORDER BY created_at DESC;`
+
 ### Despliegue en el NAS
 
 `deploy/docker-compose.yml` se pega tal cual en el editor de compose del NAS (sin `.env`): cambia las contraseñas, el

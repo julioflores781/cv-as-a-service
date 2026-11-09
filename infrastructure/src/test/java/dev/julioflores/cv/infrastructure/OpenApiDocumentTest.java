@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 class OpenApiDocumentTest {
 
     private static final String HL7_PATH = "/api/v1/hl7/translate";
+    private static final String CONTACT_MESSAGES_PATH = "/api/v1/contact/messages";
 
     /** Endpoints de lectura (GET). El POST de la demo HL7 se comprueba aparte. */
     private static final Set<String> ENDPOINTS = Set.of(
@@ -49,7 +50,29 @@ class OpenApiDocumentTest {
         documented.removeIf(p -> !p.startsWith("/api/v1"));
         Set<String> expected = new HashSet<>(ENDPOINTS);
         expected.add(HL7_PATH);
+        expected.add(CONTACT_MESSAGES_PATH);
         assertEquals(expected, documented);
+    }
+
+    @Test
+    void contactMessageOperationIsDocumentedWithItsErrors() {
+        String post = "paths.'" + CONTACT_MESSAGES_PATH + "'.post";
+        assertEquals("sendContactMessage", doc().getString(post + ".operationId"));
+        assertEquals(List.of("Contact"), doc().getList(post + ".tags"));
+        assertNotNull(doc().get(post + ".summary"));
+        assertNotNull(doc().get(post + ".description"));
+        assertNotNull(doc().get(post + ".requestBody"));
+        for (String code : List.of("201", "400", "429", "500")) {
+            assertNotNull(doc().get(post + ".responses.'" + code + "'.description"), "sin respuesta " + code);
+        }
+        for (String code : List.of("400", "429")) {
+            String problems = post + ".responses.'" + code + "'.content.'application/problem+json'";
+            assertEquals("#/components/schemas/Problem", doc().getString(problems + ".schema.'$ref'"), code);
+            assertNotNull(doc().get(problems + ".examples"), code + " sin ejemplo");
+        }
+        assertNotNull(doc().get("components.schemas.ContactMessageRequest.properties.website.description"));
+        List<Map<String, Object>> tags = doc().getList("tags");
+        assertTrue(tags.stream().anyMatch(t -> "Contact".equals(t.get("name")) && t.get("description") != null));
     }
 
     @Test
