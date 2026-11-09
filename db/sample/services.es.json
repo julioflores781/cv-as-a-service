@@ -1,0 +1,16 @@
+{
+  "services": [
+    {
+      "id": "servicio-ejemplo",
+      "title": "Servicio de ejemplo",
+      "summary": "Un servicio ficticio con precio, para las pruebas.",
+      "price": { "from": 1500, "currency": "EUR" }
+    },
+    {
+      "id": "servicio-a-consultar",
+      "title": "Servicio a consultar",
+      "summary": "Un servicio ficticio sin precio publicado.",
+      "price": null
+    }
+  ]
+}

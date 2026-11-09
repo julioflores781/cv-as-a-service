@@ -52,6 +52,9 @@ post "/api/v1/hl7/translate"                     "$ADT"  '"familyName"'
 post "/api/v1/hl7/translate?format=fhir"         "$ADT"  '"resourceType": "Bundle"'
 post "/api/v1/hl7/translate"                     "hola"  "HL7_INVALID_MESSAGE" 422
 
+expect "/api/v1/services"                        "Servicio de ejemplo"
+expect "/api/v1/projects?lang=en"                "Sample anonymous project"
+expect "/api/v1/architecture"                    "PostgreSQL"
 expect "/openapi.json"                           '"openapi"'
 expect "/swagger/"                               "OpenAPI UI"
 

@@ -1,0 +1,21 @@
+{
+  "core": { "name": "Domain", "description": "The business rules, unaware of what sits outside." },
+  "ports": [
+    {
+      "id": "database",
+      "name": "Database",
+      "description": "Where the data is stored.",
+      "adapters": [
+        { "id": "postgresql", "name": "PostgreSQL", "status": "in-this-api" },
+        { "id": "mongodb", "name": "MongoDB", "status": "production", "note": "Sample note" }
+      ]
+    },
+    {
+      "id": "queue",
+      "name": "Queues",
+      "adapters": [
+        { "id": "kafka", "name": "Kafka", "status": "experiment" }
+      ]
+    }
+  ]
+}

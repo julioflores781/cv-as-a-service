@@ -1,0 +1,32 @@
+{
+  "projects": [
+    {
+      "id": "proyecto-publico",
+      "title": "Proyecto público de ejemplo",
+      "summary": "Un producto propio ficticio, con el cliente nombrado.",
+      "relation": "own",
+      "role": "Backend y web",
+      "disclosure": "public",
+      "client": "Ejemplo S.A.",
+      "clientLabel": "empresa ficticia",
+      "startDate": "2022-01",
+      "stack": ["Java", "Quarkus", "PostgreSQL"],
+      "highlights": ["Un logro de ejemplo"],
+      "links": [{ "label": "Ver el proyecto", "url": "https://example.com/proyecto" }]
+    },
+    {
+      "id": "proyecto-anonimo",
+      "title": "Proyecto anónimo de ejemplo",
+      "summary": "Un trabajo ficticio para una empresa que no se nombra.",
+      "relation": "employer",
+      "role": "Backend",
+      "disclosure": "anonymous",
+      "clientLabel": "prepaga de ejemplo",
+      "startDate": "2019-03",
+      "endDate": "2020-11",
+      "stack": ["Java", "Oracle"],
+      "highlights": [],
+      "links": []
+    }
+  ]
+}

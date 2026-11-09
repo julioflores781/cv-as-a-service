@@ -1,0 +1,32 @@
+{
+  "projects": [
+    {
+      "id": "proyecto-publico",
+      "title": "Sample public project",
+      "summary": "A made-up product of my own, with the client named.",
+      "relation": "own",
+      "role": "Backend and web",
+      "disclosure": "public",
+      "client": "Ejemplo S.A.",
+      "clientLabel": "made-up company",
+      "startDate": "2022-01",
+      "stack": ["Java", "Quarkus", "PostgreSQL"],
+      "highlights": ["A sample achievement"],
+      "links": [{ "label": "See the project", "url": "https://example.com/proyecto" }]
+    },
+    {
+      "id": "proyecto-anonimo",
+      "title": "Sample anonymous project",
+      "summary": "Made-up work for a company that is not named.",
+      "relation": "employer",
+      "role": "Backend",
+      "disclosure": "anonymous",
+      "clientLabel": "sample health insurer",
+      "startDate": "2019-03",
+      "endDate": "2020-11",
+      "stack": ["Java", "Oracle"],
+      "highlights": [],
+      "links": []
+    }
+  ]
+}

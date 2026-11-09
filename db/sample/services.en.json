@@ -1,0 +1,16 @@
+{
+  "services": [
+    {
+      "id": "servicio-ejemplo",
+      "title": "Sample service",
+      "summary": "A made-up service with a price, for the tests.",
+      "price": { "from": 1500, "currency": "EUR" }
+    },
+    {
+      "id": "servicio-a-consultar",
+      "title": "Service on request",
+      "summary": "A made-up service with no published price.",
+      "price": null
+    }
+  ]
+}
