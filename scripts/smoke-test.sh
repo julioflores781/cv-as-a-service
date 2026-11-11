@@ -37,8 +37,8 @@ expect "/api/v1/experience/nope?lang=en"         "Experience not found" 404
 
 # post URL CUERPO FRAGMENTO [ESTADO_HTTP]: igual que expect, pero con un POST text/plain.
 post() {
-  local url=$1 payload=$2 fragment=$3 status=${4:-200} out body code
-  out=$(curl -sS -w $'\n%{http_code}' -X POST -H 'Content-Type: text/plain' --data-binary "$payload" "$BASE$url") \
+  local url=$1 payload=$2 fragment=$3 status=${4:-200} ctype=${5:-text/plain} out body code
+  out=$(curl -sS -w $'\n%{http_code}' -X POST -H "Content-Type: $ctype" --data-binary "$payload" "$BASE$url") \
     || fail "$url no responde"
   code=${out##*$'\n'}
   body=${out%$'\n'*}
@@ -51,7 +51,12 @@ ADT=$'MSH|^~\\&|HIS|HOSPITAL|LAB|HOSPITAL|20260101120000||ADT^A01^ADT_A01|MSG1|P
 post "/api/v1/hl7/translate"                     "$ADT"  '"familyName"'
 post "/api/v1/hl7/translate?format=fhir"         "$ADT"  '"resourceType": "Bundle"'
 post "/api/v1/hl7/translate"                     "hola"  "HL7_INVALID_MESSAGE" 422
+# Contacto: solo el caso inválido, para no dejar mensajes en la base de datos.
+post "/api/v1/contact/messages"                  '{"name":"","email":"x","message":"y"}' "CONTACT_INVALID" 400 application/json
 
+expect "/api/v1/services"                        "Servicio de ejemplo"
+expect "/api/v1/projects?lang=en"                "Sample anonymous project"
+expect "/api/v1/architecture"                    "PostgreSQL"
 expect "/openapi.json"                           '"openapi"'
 expect "/swagger/"                               "OpenAPI UI"
 

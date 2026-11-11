@@ -24,7 +24,7 @@ Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config`
 - **Errores:** las excepciones de negocio extienden `ApplicationException(ErrorCode, mensajeEnInglés, args…)`. Para un error nuevo: constante en `ErrorCode` (si es de negocio) y en `ApiError` (estado HTTP), y `CODIGO.title` / `CODIGO.detail` en `problems_es.properties` y `problems_en.properties`. `ProblemCatalogTest` falla si falta algo. Los apóstrofos en los `.properties` se duplican (`''`).
 - **Idioma:** `?lang` > `Accept-Language` > español. Solo se traducen el contenido y los mensajes de error, no Swagger ni los logs.
 - **Swagger:** cada endpoint documenta todas sus salidas (200/404/500) con ejemplos. `OpenApiDocumentTest` falla si falta documentación.
-- **Contenido:** el real está en `private/content/resume.*.json` (ignorado por git), lo edita su dueño a mano; léelo antes de tocarlo y mantén ES y EN con la **misma estructura**. Se publica con `scripts/make-seed.py` + `psql` (ver README). Nunca teléfono, documento de identidad ni fecha de nacimiento. Las pruebas usan el CV ficticio de `db/sample` (Ada Ejemplo); no pongas datos reales en el repo.
+- **Contenido:** el real está en `private/content/resume.*.json` (ignorado por git), lo edita su dueño a mano; léelo antes de tocarlo y mantén ES y EN con la **misma estructura**. También `services.*.json`, `projects.*.json` y `architecture.*.json` (mismo directorio y misma regla ES/EN). Se publica con `scripts/make-seed.py` + `psql` (ver README). Nunca teléfono, documento de identidad ni fecha de nacimiento. Las pruebas usan el CV ficticio de `db/sample` (Ada Ejemplo); no pongas datos reales en el repo.
 - **Pruebas:** cobertura mínima 90 % total y 80 % por módulo (la comprueba `ci-summary.py`). Todo código nuevo lleva pruebas.
 - **Commits:** Conventional Commits en inglés, **sin** `Co-Authored-By` ni líneas de atribución.
 - **CI:** un push a `main` publica una imagen en Docker Hub (`julioflores781/cv-api`). En cambios solo de documentación añade `[skip ci]` al mensaje.
@@ -43,14 +43,17 @@ Ejecuta Maven desde la raíz. En la máquina de Julio hay un `.mvn/maven.config`
 ## Hecho
 Dominio completo, 8 casos de uso, endpoints `GET /api/v1/{profile,impact,experience[/{id}],skills,education,contact,resume}`,
 **demo HL7** `POST /api/v1/hl7/translate?format=json|fhir` (HAPI; ADT^A01 y ORU^R01 en v2.5.1; mapeo manual a FHIR R4),
-errores RFC 7807 con `code` estable y textos ES/EN, Swagger completo, 127 pruebas (≈95 % de cobertura de líneas), pipeline
+errores RFC 7807 con `code` estable y textos ES/EN, Swagger completo, 188 pruebas (≈96,6 % de cobertura de líneas), pipeline
 de GitHub Actions (pruebas + cobertura → imagen Docker con smoke test, amd64 y arm64).
+**Contacto** `POST /api/v1/contact/messages` (rama `feat/contact-messages`): valida, limita por remitente (hash de la IP con sal), guarda en `contact_message` y avisa por Telegram (`ContactNotifier`); campo trampa `website` para bots. Variables `CV_CONTACT_*` (ver README).
+**Contenido editable** `GET /api/v1/{services,projects,architecture}` desde `content_version` (JSONB versionado; rama `feat/site-content`): proyectos con `disclosure` (`public`/`anonymous`; el dominio descarta el cliente de los anónimos y `make-seed.py` rechaza que lo traigan), adaptadores del hexágono con `status` honesto. Sin nada publicado responden vacío. Falta el contenido real en `private/content`.
 
 ## Siguiente (orden recomendado)
 1. **ADRs** cortos en `docs/adr/` (multi-módulo vs paquetes, Quarkus vs NestJS, errores con código estable, alcance del i18n).
 2. **Exportaciones:** `/llms.txt`, `/resume.pdf` (openhtmltopdf desde Qute), `/resume?format=jsonresume`, `ETag`.
 3. **Front Next.js** estático (ES por defecto, SEO, lee `/api/v1/resume` en el build).
-4. `contact_message` y `page_view_daily`, `/status`, Cloudflare Tunnel (Postgres, Flyway y docker-compose ya están).
+4. `page_view_daily`, `/status`, Cloudflare Tunnel (Postgres, Flyway y docker-compose ya están).
+5. `GET /api/v1/{services,projects,architecture}` desde la base de datos (JSONB versionado como el CV) para la web; los proyectos llevan `disclosure` (`public`/`anonymous`) y el nombre del cliente no sale si es anónimo.
 
 Pendiente menor: los ids de experiencia distinguen mayúsculas y los grupos de skills no; unificar en una línea, sin tipos nuevos.
 Pendiente del contenido (de su dueño): fechas de las fases dentro de Sale & Brick y confirmar las cifras de impacto.

@@ -51,11 +51,38 @@ Configuración de la API en producción (variables de entorno): `QUARKUS_DATASOU
 `QUARKUS_DATASOURCE_USERNAME` y `QUARKUS_DATASOURCE_PASSWORD`. En desarrollo y en las pruebas Quarkus levanta un
 PostgreSQL con Testcontainers por su cuenta (hace falta Docker); en dev arranca vacío: aplica un seed (el tuyo o `db/sample`).
 
+**Formulario de contacto** (`POST /api/v1/contact/messages`): guarda el mensaje en `contact_message` y avisa por Telegram.
+Variables: `CV_CONTACT_IP_SALT` (cadena larga y secreta con la que se hashea la IP; la IP nunca se guarda en claro),
+`CV_CONTACT_TELEGRAM_BOT_TOKEN` (bot creado con @BotFather) y `CV_CONTACT_TELEGRAM_CHAT_ID` (tu chat con el bot; escríbele
+primero y consulta `getUpdates`). Sin token o sin chat no se avisa, pero los mensajes se guardan igual. Límite: 5 mensajes por
+remitente y hora (`cv.contact.rate-limit.max` / `.window`), en memoria: vale para una sola instancia. Para leer los mensajes:
+`SELECT created_at, name, email, body FROM contact_message ORDER BY created_at DESC;`
+
+### Servicios, proyectos y arquitectura (contenido editable)
+
+Además del CV, la web lee tres contenidos de la base de datos (tabla `content_version`, mismo esquema versionado):
+`GET /api/v1/services` (con precio «desde» opcional), `/projects` y `/architecture` (el hexágono: núcleo, puertos y adaptadores).
+Se publican igual que el CV, con un archivo `<tipo>.<idioma>.json` en `private/content` (tipos: `services`, `projects`,
+`architecture`); solo se publican los que haya en el directorio. Estructura: mira `db/sample`.
+
+```bash
+python3 scripts/make-seed.py private/content -o private/seed.sql && psql "$DATABASE_URL" --single-transaction -f private/seed.sql
+python3 scripts/make-seed.py --rollback es --kind services | psql "$DATABASE_URL" --single-transaction   # volver atrás
+```
+
+- Cambiar un precio, quitar un adaptador del hexágono o añadir un proyecto es publicar una versión nueva: no se toca código
+  ni la web (solo hay que regenerarla; la API tarda hasta 5 minutos en verlo, `cv.content.cache-ttl`).
+- Sin nada publicado, los endpoints responden 200 con lista vacía (o sin puertos) y la web omite la sección.
+- **Clientes:** un proyecto `anonymous` solo describe al cliente en `clientLabel`; el script **rechaza** que traiga `client`,
+  así su nombre real nunca llega a la base de datos. Un proyecto `public` de una empresa (`employer`) debe traer `client`; uno propio (`own`) no necesita cliente.
+- Cada adaptador del hexágono lleva un `status` honesto: `in-this-api` (implementado aquí), `production` o `experiment`.
+
 ### Despliegue en el NAS
 
 `deploy/docker-compose.yml` se pega tal cual en el editor de compose del NAS (sin `.env`): cambia las contraseñas, el
-puerto y `QUARKUS_HTTP_CORS_ORIGINS` (el dominio de la web; sin él el navegador no puede llamar a la API).
-Levanta `cv-api` + `cv-db` (la base de datos no publica puertos). El túnel de Cloudflare apunta al puerto publicado.
+y `QUARKUS_HTTP_CORS_ORIGINS` (el dominio de la web; sin él el navegador no puede llamar a la API).
+Levanta `cv-api` + `cv-db` (la base de datos no publica puertos). `cv-api` se une a la red `padelhub_default`, donde ya corren
+los `cloudflared`: en Cloudflare Tunnel el servicio es `http://cv-api:8080`, sin IPs ni puertos publicados.
 
 ```bash
 # Publicar el CV (desde un terminal con acceso a Docker del NAS; copia antes private/seed.sql allí)

@@ -1,15 +1,23 @@
 package dev.julioflores.cv.infrastructure.adapter.in.rest;
 
+import dev.julioflores.cv.domain.Architecture;
+import dev.julioflores.cv.domain.ArchitecturePort;
 import dev.julioflores.cv.domain.Contact;
 import dev.julioflores.cv.domain.ContactLink;
 import dev.julioflores.cv.domain.Impact;
 import dev.julioflores.cv.domain.Period;
+import dev.julioflores.cv.domain.PortAdapter;
 import dev.julioflores.cv.domain.Phase;
 import dev.julioflores.cv.domain.Profile;
+import dev.julioflores.cv.domain.Project;
+import dev.julioflores.cv.domain.ProjectLink;
 import dev.julioflores.cv.domain.Qualifications;
 import dev.julioflores.cv.domain.Resume;
+import dev.julioflores.cv.domain.ServiceOffer;
+import dev.julioflores.cv.domain.ServicePrice;
 import dev.julioflores.cv.domain.SkillGroup;
 import dev.julioflores.cv.domain.WorkExperience;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.function.Function;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
@@ -165,5 +173,86 @@ final class ApiModels {
 
     static <T, R> List<R> map(List<T> source, Function<T, R> mapper) {
         return source.stream().map(mapper).toList();
+    }
+
+    @Schema(name = "ServicePrice", description = "Precio «desde» de un servicio.")
+    record ServicePriceDto(
+            @Schema(required = true, description = "Importe mínimo, sin impuestos.", example = "1500") BigDecimal from,
+            @Schema(required = true, description = "Moneda ISO 4217.", example = "EUR") String currency) {}
+
+    @Schema(name = "Service", description = "Un servicio que ofrezco.")
+    record ServiceDto(
+            @Schema(required = true, description = "Identificador estable.", example = "api-backend") String id,
+            @Schema(required = true, description = "Nombre del servicio.", example = "APIs y backend") String title,
+            @Schema(required = true, description = "Qué incluye.") String summary,
+            @Schema(nullable = true, description = "Precio «desde». Nulo significa «a consultar».") ServicePriceDto price) {}
+
+    @Schema(name = "ProjectLink", description = "Enlace relacionado con un proyecto.")
+    record ProjectLinkDto(
+            @Schema(required = true, description = "Texto del enlace.", example = "Abrir la aplicación") String label,
+            @Schema(required = true, description = "URL.", example = "https://example.com") String url) {}
+
+    @Schema(name = "Project", description = "Un proyecto en el que he trabajado.")
+    record ProjectDto(
+            @Schema(required = true, description = "Identificador estable.", example = "turnos-clinica") String id,
+            @Schema(required = true, description = "Nombre del proyecto.", example = "Plataforma de turnos médicos") String title,
+            @Schema(required = true, description = "Qué hace y qué problema resuelve.") String summary,
+            @Schema(required = true, description = "`own`: producto propio; `employer`: trabajo para una empresa.", enumeration = {"own", "employer"}, example = "employer") String relation,
+            @Schema(nullable = true, description = "Mi papel en el proyecto.", example = "Backend y web") String role,
+            @Schema(required = true, description = "`public`: se puede nombrar al cliente; `anonymous`: solo se describe.", enumeration = {"public", "anonymous"}, example = "anonymous") String disclosure,
+            @Schema(nullable = true, description = "Nombre del cliente. Solo aparece si `disclosure` es `public`: en un proyecto anónimo nunca se expone.") String client,
+            @Schema(nullable = true, description = "Descripción del cliente sin nombrarlo.", example = "clínica privada") String clientLabel,
+            @Schema(nullable = true, description = "Cuándo trabajé en él.") PeriodDto period,
+            @Schema(required = true, description = "Tecnologías usadas.") List<String> stack,
+            @Schema(required = true, description = "Logros y decisiones destacadas. Vacío si no aplica.") List<String> highlights,
+            @Schema(required = true, description = "Enlaces relacionados. Vacío si no aplica.") List<ProjectLinkDto> links) {}
+
+    @Schema(name = "PortAdapter", description = "Una tecnología que se enchufa a un puerto.")
+    record PortAdapterDto(
+            @Schema(required = true, description = "Identificador estable.", example = "postgresql") String id,
+            @Schema(required = true, description = "Nombre.", example = "PostgreSQL") String name,
+            @Schema(required = true, description = "`in-this-api`: implementado en esta API; `production`: usado en sistemas en producción; `experiment`: solo en proyectos de prueba.", enumeration = {"in-this-api", "production", "experiment"}, example = "in-this-api") String status,
+            @Schema(nullable = true, description = "Matiz sobre la experiencia con esta tecnología.") String note) {}
+
+    @Schema(name = "ArchitecturePort", description = "Un puerto del hexágono con sus adaptadores intercambiables.")
+    record ArchitecturePortDto(
+            @Schema(required = true, description = "Identificador estable.", example = "database") String id,
+            @Schema(required = true, description = "Nombre del puerto.", example = "Base de datos") String name,
+            @Schema(nullable = true, description = "Para qué sirve el puerto.") String description,
+            @Schema(required = true, description = "Adaptadores que se pueden enchufar, en orden de presentación.") List<PortAdapterDto> adapters) {}
+
+    @Schema(name = "ArchitectureCore", description = "El núcleo del hexágono, que no cambia al cambiar de adaptador.")
+    record ArchitectureCoreDto(
+            @Schema(required = true, description = "Nombre del núcleo.", example = "Dominio") String name,
+            @Schema(nullable = true, description = "Qué contiene.") String description) {}
+
+    @Schema(name = "Architecture", description = "El diagrama de arquitectura hexagonal. Sin puertos si todavía no hay nada publicado.")
+    record ArchitectureDto(
+            @Schema(required = true, description = "El núcleo.") ArchitectureCoreDto core,
+            @Schema(required = true, description = "Los puertos, en orden de presentación.") List<ArchitecturePortDto> ports) {}
+
+    static ServiceDto toDto(ServiceOffer s) {
+        ServicePrice price = s.price();
+        return new ServiceDto(s.id(), s.title(), s.summary(),
+                price == null ? null : new ServicePriceDto(price.from(), price.currency()));
+    }
+
+    static ProjectDto toDto(Project p) {
+        return new ProjectDto(
+                p.id(), p.title(), p.summary(), p.relation().value(), p.role(), p.disclosure().value(), p.client(),
+                p.clientLabel(), p.period() == null ? null : toDto(p.period()), p.stack(), p.highlights(),
+                map(p.links(), l -> new ProjectLinkDto(l.label(), l.url())));
+    }
+
+    static ArchitectureDto toDto(Architecture a) {
+        return new ArchitectureDto(new ArchitectureCoreDto(a.coreName(), a.coreDescription()), map(a.ports(), ApiModels::toDto));
+    }
+
+    static ArchitecturePortDto toDto(ArchitecturePort p) {
+        return new ArchitecturePortDto(p.id(), p.name(), p.description(), map(p.adapters(), ApiModels::toDto));
+    }
+
+    static PortAdapterDto toDto(PortAdapter a) {
+        return new PortAdapterDto(a.id(), a.name(), a.status().value(), a.note());
     }
 }

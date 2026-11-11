@@ -55,6 +55,12 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
                     description = "Contenido del CV: perfil, cifras, experiencia, skills, formación y contacto."),
             @Tag(
                     name = "HL7",
-                    description = "Demo de interoperabilidad sanitaria: traduce mensajes HL7 v2 a JSON o FHIR R4.")
+                    description = "Demo de interoperabilidad sanitaria: traduce mensajes HL7 v2 a JSON o FHIR R4."),
+            @Tag(
+                    name = "Contact",
+                    description = "Formulario de contacto: deja un mensaje y el dueño recibe un aviso."),
+            @Tag(
+                    name = "Content",
+                    description = "Contenido editable de la web, guardado en la base de datos: servicios, proyectos y el diagrama de arquitectura.")
         })
 public class OpenApiConfig extends Application {}

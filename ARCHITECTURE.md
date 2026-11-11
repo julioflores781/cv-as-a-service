@@ -14,10 +14,11 @@ El idioma se elige con `?lang=es|en`. Si falta, se usa `Accept-Language`, y si t
 | GET | `/skills?group=backend` | stack agrupado |
 | GET | `/education` | formación, certificaciones y cursos |
 | GET | `/contact` | email y perfiles |
+| GET | `/services`, `/projects`, `/architecture` | contenido editable de la web (precios, proyectos con `disclosure`, hexágono de puertos y adaptadores). **Implementado** |
 | GET | `/resume` | CV completo en un solo documento (esquema propio; el formato JSON Resume estándar llegará como `?format=jsonresume` con las exportaciones) |
 | GET | `/resume.pdf` | PDF apto para ATS |
 | POST | `/hl7/translate?format=json\|fhir` | HL7 v2.5.1 (text/plain, `ADT^A01` y `ORU^R01`) → JSON o Bundle FHIR R4. **Implementado** |
-| POST | `/contact/messages` | guarda un mensaje, con límite de peticiones |
+| POST | `/contact/messages` | guarda un mensaje (JSON `name`, `email`, `message` y el campo trampa `website`) y avisa por Telegram; límite de 5 por remitente y hora. **Implementado** |
 | GET | `/status` | uptime real, versión y commit |
 | GET | `/health/live`, `/health/ready` | sondas de salud |
 
@@ -56,12 +57,13 @@ Convenciones:
                     └──────────────┬──────────────────────┘
                                    ▼  puertos de salida
    ResumeRepository · ContactMessageRepository · Hl7Translator · ResumeRenderer
-   Mailer · RateLimiter · StatusProbe · Clock
+   ContactNotifier · RateLimiter · StatusProbe · Clock
                                    ▼
                     ┌──────────── adaptadores de salida ──────────────┐
                     │ Postgres (Panache + Flyway) · HAPI HL7/FHIR     │
                     │ PDF (Qute → HTML → PDF) · llms.txt (Qute)       │
-                    │ Quarkus Mailer · Uptime Kuma (estado)           │
+                    │ Telegram (aviso) · RateLimiter en memoria       │
+                    │ Uptime Kuma (estado)                            │
                     └─────────────────────────────────────────────────┘
 ```
 
@@ -76,6 +78,7 @@ Decisiones de diseño:
 
 - `resume_version(id, version, lang, content jsonb, published_at, active)`: instantáneas inmutables por versión e idioma. El dominio las mapea al agregado `Resume`.
 - `contact_message(id, name, email, body, created_at, ip_hash)`: la IP se guarda hasheada, nunca en claro.
+- `content_version(kind, lang, version, content jsonb, active)`: servicios, proyectos y arquitectura, versionados como el CV (un activo por tipo e idioma, rollback con `make-seed.py --rollback IDIOMA --kind TIPO`). `PostgresSiteContentRepository` los cachea 5 min y, si la base de datos falla, sirve lo último leído. Un contenido sin publicar se sirve vacío, no como error. En proyectos `anonymous` el dominio descarta el nombre del cliente.
 - `page_view_daily(day, path, count)`: contadores agregados, sin rastreo individual.
 
 Flujo de publicación: el contenido real vive **fuera del repositorio** (`private/content/resume.{es,en}.json`). `scripts/make-seed.py` genera un SQL que desactiva la versión activa de cada idioma e inserta la siguiente; se aplica con `psql`. La API lee la versión activa por JDBC (`PostgresResumeRepository`) y la mantiene en memoria 5 minutos (`cv.resume.cache-ttl`); un CV no encontrado se recuerda solo 10 s. Decisión: documento JSONB versionado y no tablas normalizadas, porque nadie edita campos sueltos y así se reutiliza el mapper y se puede volver a una versión anterior (`make-seed.py --rollback <idioma>`). Si la base de datos falla al refrescar, se sigue sirviendo el último CV leído.

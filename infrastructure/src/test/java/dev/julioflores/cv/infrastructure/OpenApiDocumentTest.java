@@ -19,6 +19,11 @@ import org.junit.jupiter.api.Test;
 class OpenApiDocumentTest {
 
     private static final String HL7_PATH = "/api/v1/hl7/translate";
+    private static final String CONTACT_MESSAGES_PATH = "/api/v1/contact/messages";
+
+    /** Contenido editable: GET con lista (o diagrama) vacía en vez de 404, por eso no entran en ENDPOINTS. */
+    private static final Set<String> CONTENT_ENDPOINTS =
+            Set.of("/api/v1/services", "/api/v1/projects", "/api/v1/architecture");
 
     /** Endpoints de lectura (GET). El POST de la demo HL7 se comprueba aparte. */
     private static final Set<String> ENDPOINTS = Set.of(
@@ -49,7 +54,57 @@ class OpenApiDocumentTest {
         documented.removeIf(p -> !p.startsWith("/api/v1"));
         Set<String> expected = new HashSet<>(ENDPOINTS);
         expected.add(HL7_PATH);
+        expected.add(CONTACT_MESSAGES_PATH);
+        expected.addAll(CONTENT_ENDPOINTS);
         assertEquals(expected, documented);
+    }
+
+    @Test
+    void contactMessageOperationIsDocumentedWithItsErrors() {
+        String post = "paths.'" + CONTACT_MESSAGES_PATH + "'.post";
+        assertEquals("sendContactMessage", doc().getString(post + ".operationId"));
+        assertEquals(List.of("Contact"), doc().getList(post + ".tags"));
+        assertNotNull(doc().get(post + ".summary"));
+        assertNotNull(doc().get(post + ".description"));
+        assertNotNull(doc().get(post + ".requestBody"));
+        for (String code : List.of("201", "400", "429", "500")) {
+            assertNotNull(doc().get(post + ".responses.'" + code + "'.description"), "sin respuesta " + code);
+        }
+        for (String code : List.of("400", "429")) {
+            String problems = post + ".responses.'" + code + "'.content.'application/problem+json'";
+            assertEquals("#/components/schemas/Problem", doc().getString(problems + ".schema.'$ref'"), code);
+            assertNotNull(doc().get(problems + ".examples"), code + " sin ejemplo");
+        }
+        assertNotNull(doc().get("components.schemas.ContactMessageRequest.properties.website.description"));
+        List<Map<String, Object>> tags = doc().getList("tags");
+        assertTrue(tags.stream().anyMatch(t -> "Contact".equals(t.get("name")) && t.get("description") != null));
+    }
+
+    @Test
+    void contentEndpointsAreDocumentedWithExamplesAndLanguageParameters() {
+        for (String path : CONTENT_ENDPOINTS) {
+            Map<String, Object> op = operation(path);
+            assertNotNull(op.get("operationId"), path + " sin operationId");
+            assertNotNull(op.get("summary"), path + " sin summary");
+            assertNotNull(op.get("description"), path + " sin description");
+            assertEquals(List.of("Content"), op.get("tags"), path);
+            String media = "paths.'" + path + "'.get.responses.'200'.content.'application/json'";
+            assertNotNull(doc().get(media + ".examples.es"), path + " sin ejemplo en español");
+            assertNotNull(doc().get(media + ".examples.en"), path + " sin ejemplo en inglés");
+            List<Map<String, Object>> params = doc().getList("paths.'" + path + "'.get.parameters");
+            List<String> names = params.stream().map(p -> (String) p.get("name")).toList();
+            assertTrue(names.contains("lang") && names.contains("Accept-Language"), path + " sin parámetros de idioma");
+            assertEquals("#/components/schemas/Problem",
+                    doc().getString("paths.'" + path + "'.get.responses.'500'.content.'application/problem+json'.schema.'$ref'"));
+        }
+        List<Map<String, Object>> tags = doc().getList("tags");
+        assertTrue(tags.stream().anyMatch(t -> "Content".equals(t.get("name")) && t.get("description") != null));
+    }
+
+    @Test
+    void anonymousProjectsDocumentThatTheClientIsNeverExposed() {
+        String description = doc().getString("components.schemas.Project.properties.client.description");
+        assertTrue(description.contains("`public`") && description.contains("nunca"), description);
     }
 
     @Test

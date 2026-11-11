@@ -74,15 +74,15 @@ final class ResumeJsonMapper {
                 strings(n.path("highlights")));
     }
 
-    private static <T> List<T> list(JsonNode array, Function<JsonNode, T> mapper) {
+    static <T> List<T> list(JsonNode array, Function<JsonNode, T> mapper) {
         return StreamSupport.stream(array.spliterator(), false).map(mapper).toList();
     }
 
-    private static List<String> strings(JsonNode array) {
+    static List<String> strings(JsonNode array) {
         return list(array, JsonNode::asText);
     }
 
-    private static String text(JsonNode node, String field) {
+    static String text(JsonNode node, String field) {
         JsonNode value = node.path(field);
         return value.isMissingNode() || value.isNull() ? null : value.asText();
     }
