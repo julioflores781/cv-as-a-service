@@ -1,21 +1,18 @@
 package dev.julioflores.cv.infrastructure.adapter.out.ratelimit;
 
 import dev.julioflores.cv.application.port.out.RateLimiter;
-import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.LongSupplier;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
  * Ventana deslizante por clave, en memoria. Basta mientras la API corra en una sola instancia (es el caso del NAS);
  * con varias réplicas habría que moverla a Redis o a la base de datos. Se reinicia con la aplicación.
+ * No es un bean: {@code RateLimiterConfig} crea una instancia por uso (contacto y login), cada una con su ventana.
  */
-@ApplicationScoped
 public class InMemoryRateLimiter implements RateLimiter {
 
     /** Tope de claves recordadas: pasado este punto se descartan las que ya caducaron. */
@@ -26,10 +23,7 @@ public class InMemoryRateLimiter implements RateLimiter {
     private final LongSupplier nanoClock;
     private final Map<String, Deque<Long>> hits = new HashMap<>();
 
-    @Inject
-    InMemoryRateLimiter(
-            @ConfigProperty(name = "cv.contact.rate-limit.max") int max,
-            @ConfigProperty(name = "cv.contact.rate-limit.window") Duration window) {
+    public InMemoryRateLimiter(int max, Duration window) {
         this(max, window, System::nanoTime);
     }
 

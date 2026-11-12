@@ -90,4 +90,65 @@ class ProblemCatalogTest {
             assertTrue(error.status() >= 400 && error.status() < 600, error + " con estado " + error.status());
         }
     }
+
+    @Test
+    void adminErrorsHaveTheirDocumentedStatuses() { // T117 (parte auth): los códigos nuevos y su estado HTTP
+        assertEquals(401, ApiError.ADMIN_INVALID_CREDENTIALS.status());
+        assertEquals(401, ApiError.ADMIN_UNAUTHORIZED.status());
+        assertEquals(403, ApiError.ADMIN_CURRENT_PASSWORD_WRONG.status());
+        assertEquals(422, ApiError.ADMIN_WEAK_PASSWORD.status());
+        assertEquals(429, ApiError.ADMIN_LOGIN_LOCKED.status());
+        assertEquals(429, ApiError.ADMIN_LOGIN_RATE_LIMITED.status());
+        assertEquals(ApiError.ADMIN_UNAUTHORIZED, ApiError.fromStatus(401));
+        assertEquals(ApiError.FORBIDDEN, ApiError.fromStatus(403));
+        assertEquals("Too many failed attempts. Try again in 900 seconds.",
+                ProblemMessages.detail(ApiError.ADMIN_LOGIN_LOCKED, Language.EN, List.of(900L)));
+    }
+
+    @Test
+    void contentErrorsHaveTheirDocumentedStatusesAndMessages() { // T117 (parte contenido)
+        assertEquals(409, ApiError.CONTENT_VERSION_CONFLICT.status());
+        assertEquals(404, ApiError.CONTENT_VERSION_NOT_FOUND.status());
+        assertEquals(422, ApiError.CONTENT_INVALID.status());
+        assertEquals(422, ApiError.CONTENT_PARITY_BROKEN.status());
+        assertEquals(413, ApiError.CONTENT_TOO_LARGE.status());
+        assertEquals(ApiError.NOT_FOUND, ApiError.of(ErrorCode.NOT_FOUND));
+        assertEquals("Someone published first: the active version in 'es' is 4, not the one you were editing. Reload and try again.",
+                ProblemMessages.detail(ApiError.CONTENT_VERSION_CONFLICT, Language.EN, List.of("es", "4")));
+        assertEquals("El contenido incumple las reglas (2 problema(s)). El detalle está en «errors».",
+                ProblemMessages.detail(ApiError.CONTENT_INVALID, Language.ES, List.of("2")));
+    }
+
+    @Test
+    void imageErrorsHaveTheirDocumentedStatusesAndMessages() { // T117 (parte imágenes)
+        assertEquals(400, ApiError.IMAGE_INVALID.status());
+        assertEquals(413, ApiError.IMAGE_TOO_LARGE.status());
+        assertEquals(415, ApiError.IMAGE_UNSUPPORTED_TYPE.status());
+        assertEquals(503, ApiError.IMAGE_STORAGE_UNAVAILABLE.status());
+        assertEquals(404, ApiError.IMAGE_NOT_FOUND.status());
+        assertEquals(409, ApiError.IMAGE_IN_USE.status());
+        assertEquals("The image is larger than the 5 MB limit.",
+                ProblemMessages.detail(ApiError.IMAGE_TOO_LARGE, Language.EN, List.of("5")));
+        assertEquals("No existe ninguna imagen con el id «abc».",
+                ProblemMessages.detail(ApiError.IMAGE_NOT_FOUND, Language.ES, List.of("abc")));
+        assertEquals("There is no image with id 'abc'.",
+                ProblemMessages.detail(ApiError.IMAGE_NOT_FOUND, Language.EN, List.of("abc")));
+    }
+
+    @Test
+    void noDetailLeavesAnUnsubstitutedPlaceholderWhenGivenAsManyArgumentsAsItHas() {
+        // Un texto con {n} necesita n+1 argumentos; si la excepción correspondiente no los pasa, el marcador llega al cliente.
+        // Esto fija el contrato del catálogo (cada marcador se puede rellenar); que cada excepción pase sus argumentos lo
+        // comprueban las pruebas de los recursos (p. ej. el 404 y el 409 del borrado de imágenes).
+        java.util.regex.Pattern marker = java.util.regex.Pattern.compile("\\{(\\d+)}");
+        for (ApiError error : ApiError.values()) {
+            for (Language language : Language.values()) {
+                String raw = ProblemMessages.bundle(language).getString(error.name() + ".detail");
+                int needed = marker.matcher(raw).results().mapToInt(m -> Integer.parseInt(m.group(1)) + 1).max().orElse(0);
+                List<Object> args = java.util.Collections.nCopies(needed, "X");
+                String detail = ProblemMessages.detail(error, language, args);
+                assertFalse(marker.matcher(detail).find(), error + " " + language + ": " + detail);
+            }
+        }
+    }
 }

@@ -1,7 +1,14 @@
 package dev.julioflores.cv.infrastructure.config;
 
+import dev.julioflores.cv.application.port.in.ChangeAdminPasswordUseCase;
+import dev.julioflores.cv.application.port.in.CleanupOrphanImagesUseCase;
+import dev.julioflores.cv.application.port.in.DeleteImageUseCase;
+import dev.julioflores.cv.application.port.in.ListImagesUseCase;
+import dev.julioflores.cv.application.port.in.UploadProjectImageUseCase;
 import dev.julioflores.cv.application.port.in.GetArchitectureUseCase;
+import dev.julioflores.cv.application.port.in.GetContentVersionUseCase;
 import dev.julioflores.cv.application.port.in.GetContactUseCase;
+import dev.julioflores.cv.application.port.in.GetEditableContentUseCase;
 import dev.julioflores.cv.application.port.in.GetEducationUseCase;
 import dev.julioflores.cv.application.port.in.GetExperienceUseCase;
 import dev.julioflores.cv.application.port.in.GetImpactUseCase;
@@ -10,16 +17,37 @@ import dev.julioflores.cv.application.port.in.GetProjectsUseCase;
 import dev.julioflores.cv.application.port.in.GetResumeUseCase;
 import dev.julioflores.cv.application.port.in.GetServicesUseCase;
 import dev.julioflores.cv.application.port.in.GetSkillsUseCase;
+import dev.julioflores.cv.application.port.in.ListContactMessagesUseCase;
+import dev.julioflores.cv.application.port.in.ListContentVersionsUseCase;
+import dev.julioflores.cv.application.port.in.LoginAdminUseCase;
+import dev.julioflores.cv.application.port.in.LogoutAllSessionsUseCase;
+import dev.julioflores.cv.application.port.in.RollbackContentUseCase;
+import dev.julioflores.cv.application.port.in.SaveEditableContentUseCase;
 import dev.julioflores.cv.application.port.in.SubmitContactMessageUseCase;
 import dev.julioflores.cv.application.port.in.TranslateHl7UseCase;
+import dev.julioflores.cv.application.port.in.VerifyAdminSessionUseCase;
+import dev.julioflores.cv.application.port.out.AdminAccountRepository;
 import dev.julioflores.cv.application.port.out.ContactMessageRepository;
 import dev.julioflores.cv.application.port.out.ContactNotifier;
+import dev.julioflores.cv.application.port.out.ContentCacheInvalidator;
+import dev.julioflores.cv.application.port.out.ContentVersionRepository;
+import dev.julioflores.cv.application.port.out.FileStoragePort;
 import dev.julioflores.cv.application.port.out.Hl7Translator;
+import dev.julioflores.cv.application.port.out.ImageReferenceRepository;
+import dev.julioflores.cv.application.port.out.PasswordHasher;
 import dev.julioflores.cv.application.port.out.RateLimiter;
 import dev.julioflores.cv.application.port.out.ResumeRepository;
+import dev.julioflores.cv.application.port.out.SessionTokenIssuer;
 import dev.julioflores.cv.application.port.out.SiteContentRepository;
+import dev.julioflores.cv.application.service.ChangeAdminPasswordService;
+import dev.julioflores.cv.application.service.CleanupOrphanImagesService;
+import dev.julioflores.cv.application.service.DeleteImageService;
+import dev.julioflores.cv.application.service.ListImagesService;
+import dev.julioflores.cv.application.service.UploadProjectImageService;
 import dev.julioflores.cv.application.service.GetArchitectureService;
+import dev.julioflores.cv.application.service.GetContentVersionService;
 import dev.julioflores.cv.application.service.GetContactService;
+import dev.julioflores.cv.application.service.GetEditableContentService;
 import dev.julioflores.cv.application.service.GetEducationService;
 import dev.julioflores.cv.application.service.GetExperienceService;
 import dev.julioflores.cv.application.service.GetImpactService;
@@ -28,10 +56,19 @@ import dev.julioflores.cv.application.service.GetProjectsService;
 import dev.julioflores.cv.application.service.GetResumeService;
 import dev.julioflores.cv.application.service.GetServicesService;
 import dev.julioflores.cv.application.service.GetSkillsService;
+import dev.julioflores.cv.application.service.ListContactMessagesService;
+import dev.julioflores.cv.application.service.ListContentVersionsService;
+import dev.julioflores.cv.application.service.LoginAdminService;
+import dev.julioflores.cv.application.service.LogoutAllSessionsService;
+import dev.julioflores.cv.application.service.RollbackContentService;
+import dev.julioflores.cv.application.service.SaveEditableContentService;
 import dev.julioflores.cv.application.service.SubmitContactMessageService;
 import dev.julioflores.cv.application.service.TranslateHl7Service;
+import dev.julioflores.cv.application.service.VerifyAdminSessionService;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
+import jakarta.inject.Named;
+import java.time.Clock;
 
 /** Único punto donde se cablean los casos de uso (application no conoce CDI). */
 @ApplicationScoped
@@ -87,8 +124,16 @@ public class UseCaseConfig {
 
     @Produces
     @ApplicationScoped
+    ListContactMessagesUseCase listContactMessages(ContactMessageRepository messages) {
+        return new ListContactMessagesService(messages);
+    }
+
+    @Produces
+    @ApplicationScoped
     SubmitContactMessageUseCase submitContactMessage(
-            ContactMessageRepository messages, ContactNotifier notifier, RateLimiter rateLimiter) {
+            ContactMessageRepository messages,
+            ContactNotifier notifier,
+            @Named(RateLimiterConfig.CONTACT) RateLimiter rateLimiter) {
         return new SubmitContactMessageService(messages, notifier, rateLimiter);
     }
 
@@ -108,5 +153,102 @@ public class UseCaseConfig {
     @ApplicationScoped
     GetArchitectureUseCase getArchitecture(SiteContentRepository content) {
         return new GetArchitectureService(content);
+    }
+
+    @Produces
+    @ApplicationScoped
+    Clock clock() {
+        return Clock.systemUTC();
+    }
+
+    @Produces
+    @ApplicationScoped
+    LoginAdminUseCase loginAdmin(
+            AdminAccountRepository accounts,
+            PasswordHasher hasher,
+            SessionTokenIssuer issuer,
+            @Named(RateLimiterConfig.ADMIN_LOGIN) RateLimiter globalLimiter,
+            Clock clock,
+            AdminConfig config) {
+        return new LoginAdminService(
+                accounts, hasher, issuer, globalLimiter, clock, config.maxFailures(), config.lock());
+    }
+
+    @Produces
+    @ApplicationScoped
+    VerifyAdminSessionUseCase verifyAdminSession(AdminAccountRepository accounts) {
+        return new VerifyAdminSessionService(accounts);
+    }
+
+    @Produces
+    @ApplicationScoped
+    ChangeAdminPasswordUseCase changeAdminPassword(
+            AdminAccountRepository accounts,
+            PasswordHasher hasher,
+            SessionTokenIssuer issuer,
+            Clock clock,
+            AdminConfig config) {
+        return new ChangeAdminPasswordService(accounts, hasher, issuer, clock, config.maxFailures(), config.lock());
+    }
+
+    @Produces
+    @ApplicationScoped
+    LogoutAllSessionsUseCase logoutAllSessions(AdminAccountRepository accounts) {
+        return new LogoutAllSessionsService(accounts);
+    }
+
+    @Produces
+    @ApplicationScoped
+    GetEditableContentUseCase getEditableContent(ContentVersionRepository versions) {
+        return new GetEditableContentService(versions);
+    }
+
+    @Produces
+    @ApplicationScoped
+    SaveEditableContentUseCase saveEditableContent(ContentVersionRepository versions, ContentCacheInvalidator cache) {
+        return new SaveEditableContentService(versions, cache);
+    }
+
+    @Produces
+    @ApplicationScoped
+    ListContentVersionsUseCase listContentVersions(ContentVersionRepository versions) {
+        return new ListContentVersionsService(versions);
+    }
+
+    @Produces
+    @ApplicationScoped
+    GetContentVersionUseCase getContentVersion(ContentVersionRepository versions) {
+        return new GetContentVersionService(versions);
+    }
+
+    @Produces
+    @ApplicationScoped
+    RollbackContentUseCase rollbackContent(ContentVersionRepository versions, ContentCacheInvalidator cache) {
+        return new RollbackContentService(versions, cache);
+    }
+
+    @Produces
+    @ApplicationScoped
+    UploadProjectImageUseCase uploadProjectImage(FileStoragePort storage) {
+        return new UploadProjectImageService(storage);
+    }
+
+    @Produces
+    @ApplicationScoped
+    ListImagesUseCase listImages(FileStoragePort storage, ImageReferenceRepository references) {
+        return new ListImagesService(storage, references);
+    }
+
+    @Produces
+    @ApplicationScoped
+    DeleteImageUseCase deleteImage(FileStoragePort storage, ImageReferenceRepository references) {
+        return new DeleteImageService(storage, references);
+    }
+
+    @Produces
+    @ApplicationScoped
+    CleanupOrphanImagesUseCase cleanupOrphanImages(
+            FileStoragePort storage, ImageReferenceRepository references, Clock clock) {
+        return new CleanupOrphanImagesService(storage, references, clock);
     }
 }

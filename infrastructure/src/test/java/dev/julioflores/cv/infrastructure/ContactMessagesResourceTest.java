@@ -8,10 +8,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.ValidatableResponse;
 import jakarta.inject.Inject;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -138,5 +141,19 @@ class ContactMessagesResourceTest {
     void withoutTheCloudflareHeaderTheSocketAddressIsUsed() {
         given().contentType(ContentType.JSON).body(json("Ada", "ada-socket@example.com", BODY, null))
                 .when().post(PATH).then().statusCode(org.hamcrest.Matchers.anyOf(equalTo(201), equalTo(429)));
+    }
+
+    @TestHTTPResource(PATH)
+    URI contact;
+
+    @Test
+    void bodiesOverTheFixedPublicLimitAreCutWhetherTheyDeclareTheirLengthOrAreChunked() { // T137 (límite global ampliado para las imágenes)
+        // JSON válido: si el límite no cortara, el cuerpo se leería entero y daría un 400 de validación, no un 413.
+        byte[] big = json("Ada", "ada@example.com", "x".repeat(300 * 1024), null).getBytes(StandardCharsets.UTF_8);
+        byte[] huge = json("Ada", "ada@example.com", "x".repeat(4 * 1024 * 1024), null).getBytes(StandardCharsets.UTF_8);
+        assertEquals(413, RawHttp.postWithLength(contact, "application/json", big));
+        assertEquals(413, RawHttp.postChunked(contact, "application/json", big));
+        assertEquals(413, RawHttp.postWithLength(contact, "application/json", huge));
+        assertEquals(413, RawHttp.postChunked(contact, "application/json", huge));
     }
 }

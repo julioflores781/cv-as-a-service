@@ -4,7 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.julioflores.cv.infrastructure.adapter.out.ratelimit.InMemoryRateLimiter;
+import dev.julioflores.cv.application.port.out.RateLimiter;
+import dev.julioflores.cv.infrastructure.config.RateLimiterConfig;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import java.lang.reflect.Constructor;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
@@ -14,6 +18,14 @@ import org.junit.jupiter.api.Test;
 /** Es @QuarkusTest solo para que JaCoCo mida la clase (ver CLAUDE.md); construye el limitador con un reloj propio. */
 @QuarkusTest
 class InMemoryRateLimiterTest {
+
+    @Inject
+    @Named(RateLimiterConfig.CONTACT)
+    RateLimiter contact;
+
+    @Inject
+    @Named(RateLimiterConfig.ADMIN_LOGIN)
+    RateLimiter adminLogin;
 
     private final AtomicLong now = new AtomicLong();
 
@@ -69,5 +81,26 @@ class InMemoryRateLimiterTest {
         now.set(Duration.ofMinutes(2).toNanos());
         assertTrue(limiter.tryAcquire("late"));
         assertTrue(limiter.tryAcquire("k0"));
+    }
+
+    @Test
+    void theLoginLimitIsTenPerMinuteAndIndependentFromTheContactOne() throws Exception { // T90 (parte limitador)
+        InMemoryRateLimiter login = limiter(10, Duration.ofMinutes(1));
+        for (int i = 0; i < 10; i++) {
+            assertTrue(login.tryAcquire("admin-login"));
+        }
+        assertFalse(login.tryAcquire("admin-login"));
+        now.set(Duration.ofMinutes(1).toNanos());
+        assertTrue(login.tryAcquire("admin-login"));
+
+        // Los dos beans del contenedor son instancias distintas: agotar uno no toca al otro.
+        assertTrue(contact != adminLogin);
+        String key = "independencia-" + System.nanoTime();
+        int contactMax = 3; // %test.cv.contact.rate-limit.max
+        for (int i = 0; i < contactMax; i++) {
+            assertTrue(contact.tryAcquire(key));
+        }
+        assertFalse(contact.tryAcquire(key));
+        assertTrue(adminLogin.tryAcquire(key), "el cupo de contacto no debe consumir el del login");
     }
 }

@@ -1,6 +1,7 @@
 package dev.julioflores.cv.infrastructure.adapter.in.rest;
 
 import dev.julioflores.cv.application.port.in.GetProjectsUseCase;
+import dev.julioflores.cv.application.port.out.FileStoragePort;
 import jakarta.ws.rs.BeanParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -21,16 +22,18 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 public class ProjectsResource {
 
     private final GetProjectsUseCase getProjects;
+    private final FileStoragePort media;
 
-    public ProjectsResource(GetProjectsUseCase getProjects) {
+    public ProjectsResource(GetProjectsUseCase getProjects, FileStoragePort media) {
         this.getProjects = getProjects;
+        this.media = media;
     }
 
     @GET
     @Operation(
             operationId = "getProjects",
             summary = "Proyectos en los que he trabajado",
-            description = "Proyectos propios y de empresas donde he hecho backend y web. El nombre del cliente solo se expone si el proyecto es `public`; en uno `anonymous` solo se describe al cliente (`clientLabel`). Si todavía no hay nada publicado en ese idioma responde 200 con contenido vacío, no un error.")
+            description = "Proyectos propios y de empresas donde he hecho backend y web. El nombre del cliente solo se expone si el proyecto es `public`; en uno `anonymous` solo se describe al cliente (`clientLabel`). `images` trae las capturas (la primera es la portada) solo en proyectos propios y públicos; si no hay, `[]`. Si todavía no hay nada publicado en ese idioma responde 200 con contenido vacío, no un error.")
     @APIResponse(
             responseCode = "200",
             description = "Proyectos en el idioma pedido.",
@@ -42,6 +45,6 @@ public class ProjectsResource {
                         @ExampleObject(name = "en", summary = "Inglés (`?lang=en`)", value = OpenApiExamples.PROJECTS_EN)
                     }))
     public List<ApiModels.ProjectDto> projects(@BeanParam LanguageParams params) {
-        return ApiModels.map(getProjects.execute(params.language()), ApiModels::toDto);
+        return ApiModels.map(getProjects.execute(params.language()), project -> ApiModels.toDto(project, media::publicUrl));
     }
 }
