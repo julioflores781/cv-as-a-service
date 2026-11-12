@@ -3,6 +3,9 @@
 # Uso: scripts/smoke-test.sh [URL_BASE]      (por defecto http://localhost:8080)
 # En el pipeline se ejecuta contra el contenedor ANTES de publicar la imagen.
 # Espera el CV ficticio de db/sample (Ada Ejemplo): aplícalo a la base antes de lanzarlo.
+# Y que la instancia se haya arrancado con el admin activo y la URL pública de las imágenes (valores de prueba, no secretos):
+#   CV_ADMIN_JWT_SECRET (≥ 32 caracteres), CV_ADMIN_EDGE_BLOCK=true y R2_PUBLIC_URL=https://media.example.test
+# Sin el secreto el admin queda deshabilitado (404 en /api/v1/admin) y la comprobación del 401 falla a propósito.
 set -euo pipefail
 
 BASE="${1:-http://localhost:8080}"
@@ -56,8 +59,21 @@ post "/api/v1/contact/messages"                  '{"name":"","email":"x","messag
 
 expect "/api/v1/services"                        "Servicio de ejemplo"
 expect "/api/v1/projects?lang=en"                "Sample anonymous project"
+# El proyecto propio y público del ejemplo lleva una imagen: sale con la URL pública compuesta por el servidor.
+expect "/api/v1/projects?lang=en"                "https://media.example.test/site/projects/00000000-0000-4000-8000-000000000001.webp"
 expect "/api/v1/architecture"                    "PostgreSQL"
 expect "/openapi.json"                           '"openapi"'
 expect "/swagger/"                               "OpenAPI UI"
+
+# Administración: sin token todo es 401 con su `code` estable (el login es lo único abierto y no se prueba aquí: haría falta la contraseña).
+expect "/api/v1/admin/auth/session"              "ADMIN_UNAUTHORIZED" 401
+expect "/api/v1/admin/content/services"          "ADMIN_UNAUTHORIZED" 401
+expect "/api/v1/admin/images"                    "ADMIN_UNAUTHORIZED" 401
+
+# Con CV_ADMIN_EDGE_BLOCK=true, lo que llegue con cabeceras de Cloudflare (CF-Ray) ni siquiera llega a pedir token: 404.
+edge=$(curl -sS -o /dev/null -w '%{http_code}' -H 'CF-Ray: 0000000000000000-MAD' "$BASE/api/v1/admin/auth/session") \
+  || fail "/api/v1/admin/auth/session no responde"
+[ "$edge" = "404" ] || fail "/api/v1/admin con CF-Ray devolvió $edge (esperado 404: ¿falta CV_ADMIN_EDGE_BLOCK=true?)"
+echo "✅ /api/v1/admin con CF-Ray -> 404"
 
 echo "🎉 smoke test completo"

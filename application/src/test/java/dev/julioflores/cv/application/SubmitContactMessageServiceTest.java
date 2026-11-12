@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.julioflores.cv.application.contact.ContactMessageEntry;
 import dev.julioflores.cv.application.contact.ContactSubmission;
 import dev.julioflores.cv.application.error.ErrorCode;
 import dev.julioflores.cv.application.port.out.ContactMessageRepository;
@@ -27,9 +28,17 @@ class SubmitContactMessageServiceTest {
     private boolean allowed = true;
     private final List<String> limiterKeys = new ArrayList<>();
 
-    private final ContactMessageRepository repository = (message, key) -> {
-        saved.add(message);
-        savedKeys.add(key);
+    private final ContactMessageRepository repository = new ContactMessageRepository() {
+        @Override
+        public void save(ContactMessage message, String key) {
+            saved.add(message);
+            savedKeys.add(key);
+        }
+
+        @Override
+        public List<ContactMessageEntry> findNewestFirst(Long before, int limit) {
+            throw new UnsupportedOperationException("not used when submitting");
+        }
     };
     private final ContactNotifier notifier = notified::add;
     private final RateLimiter limiter = key -> {

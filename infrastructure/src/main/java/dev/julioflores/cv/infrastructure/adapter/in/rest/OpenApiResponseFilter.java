@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import org.eclipse.microprofile.openapi.OASFactory;
 import org.eclipse.microprofile.openapi.OASFilter;
 import org.eclipse.microprofile.openapi.models.OpenAPI;
+import org.eclipse.microprofile.openapi.models.PathItem;
 import org.eclipse.microprofile.openapi.models.headers.Header;
 import org.eclipse.microprofile.openapi.models.media.Schema;
 import org.eclipse.microprofile.openapi.models.responses.APIResponse;
@@ -22,6 +23,9 @@ import org.eclipse.microprofile.openapi.models.responses.APIResponses;
 public class OpenApiResponseFilter implements OASFilter {
 
     private static final Map<String, Object> UNEXPECTED_EXAMPLE = unexpectedExample();
+    private static final Map<String, Object> UNAUTHORIZED_EXAMPLE = problemExample(
+            "Sesión no válida", 401,
+            "Falta la sesión, ha caducado o ha sido revocada. Inicia sesión de nuevo.", "ADMIN_UNAUTHORIZED");
 
     @Override
     public void filterOpenAPI(OpenAPI openAPI) {
@@ -31,6 +35,10 @@ public class OpenApiResponseFilter implements OASFilter {
         documentErrorCodes(openAPI);
         openAPI.getPaths().getPathItems().forEach((path, item) -> {
             if (!path.startsWith("/api/v1")) {
+                return;
+            }
+            if (path.startsWith("/api/v1/admin")) {
+                documentAdmin(item);
                 return;
             }
             if (item.getGET() != null) {
@@ -47,6 +55,27 @@ public class OpenApiResponseFilter implements OASFilter {
             if (item.getPOST() != null) {
                 addUnexpected(item.getPOST().getResponses());
             }
+        });
+    }
+
+    /** Admin: nunca se cachea, y las operaciones con `bearerAuth` pueden dar 401. */
+    private static void documentAdmin(PathItem item) {
+        item.getOperations().values().forEach(operation -> {
+            APIResponse ok = operation.getResponses().getAPIResponse("200");
+            if (ok != null) {
+                ok.addHeader(HttpHeaders.CACHE_CONTROL,
+                        header("Las respuestas de administración nunca se cachean.", ApiCacheHeaders.ADMIN_CACHE_CONTROL_VALUE));
+            }
+            if (operation.getSecurity() != null && !operation.getSecurity().isEmpty()) {
+                operation.getResponses().addAPIResponse("401", OASFactory.createAPIResponse()
+                        .description("Sin sesión, token inválido o caducado, o sesión revocada (`ADMIN_UNAUTHORIZED`).")
+                        .addHeader(HttpHeaders.WWW_AUTHENTICATE, header("Desafío de autenticación.", "Bearer"))
+                        .content(OASFactory.createContent().addMediaType(ProblemResponse.MEDIA_TYPE,
+                                OASFactory.createMediaType()
+                                        .schema(OASFactory.createSchema().ref("#/components/schemas/Problem"))
+                                        .example(UNAUTHORIZED_EXAMPLE))));
+            }
+            addUnexpected(operation.getResponses());
         });
     }
 
@@ -71,12 +100,16 @@ public class OpenApiResponseFilter implements OASFilter {
     }
 
     private static Map<String, Object> unexpectedExample() {
+        return problemExample("Error interno", 500, "Ha ocurrido un error inesperado.", "UNEXPECTED");
+    }
+
+    private static Map<String, Object> problemExample(String title, int status, String detail, String code) {
         Map<String, Object> example = new LinkedHashMap<>();
         example.put("type", "about:blank");
-        example.put("title", "Error interno");
-        example.put("status", 500);
-        example.put("detail", "Ha ocurrido un error inesperado.");
-        example.put("code", "UNEXPECTED");
+        example.put("title", title);
+        example.put("status", status);
+        example.put("detail", detail);
+        example.put("code", code);
         return example;
     }
 

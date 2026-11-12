@@ -3,6 +3,7 @@ package dev.julioflores.cv.infrastructure;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.tngtech.archunit.base.DescribedPredicate;
 import com.tngtech.archunit.core.domain.JavaClass;
@@ -99,6 +100,52 @@ class ArchitectureTest {
         noClasses().that().resideOutsideOfPackage(ERROR_PACKAGE)
                 .should().dependOnClassesThat().haveSimpleName("ProblemMessages")
                 .check(classes);
+    }
+
+    private static final String SECURITY_ADAPTER = "dev.julioflores.cv.infrastructure.adapter.out.security..";
+    private static final String CONFIG = "dev.julioflores.cv.infrastructure.config..";
+
+    @Test
+    void cryptoLibrariesLiveOnlyInOutboundAdaptersAndConfig() { // T121 (parte auth)
+        noClasses().that().resideOutsideOfPackages(ADAPTER_OUT, CONFIG)
+                .should().dependOnClassesThat().resideInAnyPackage("software.amazon..", "org.bouncycastle..")
+                .check(classes);
+    }
+
+    @Test
+    void domainAndApplicationDoNotUseCryptoOrJwtLibraries() { // T121 (parte auth)
+        noClasses().that().resideInAnyPackage(DOMAIN, APPLICATION)
+                .should().dependOnClassesThat().resideInAnyPackage(
+                        "software.amazon..", "org.bouncycastle..", "io.smallrye.jwt..", "org.eclipse.microprofile.jwt..")
+                .check(classes);
+    }
+
+    @Test
+    void onlyTheSecurityAdapterTouchesArgon2AndJwtBuilding() { // T121 (parte auth)
+        noClasses().that().resideOutsideOfPackage(SECURITY_ADAPTER)
+                .should().dependOnClassesThat().resideInAnyPackage("org.bouncycastle..", "io.smallrye.jwt.build..")
+                .check(classes);
+    }
+
+    @Test
+    void theSecurityAdapterIsActuallyAnalysed() {
+        // Evita el falso positivo de las reglas anteriores: el adaptador existe y usa de verdad esas librerías.
+        assertFalse(classes.that(resideIn(SECURITY_ADAPTER)).isEmpty(), "adapter.out.security not imported");
+    }
+
+    @Test
+    void theAwsSdkIsOnlyUsedByTheStorageAdapterAndItsClientConfig() { // T121 (parte imágenes)
+        noClasses().that().resideOutsideOfPackages(ADAPTER_OUT, CONFIG)
+                .should().dependOnClassesThat().resideInAnyPackage("software.amazon..")
+                .check(classes);
+        noClasses().that().resideInAnyPackage(DOMAIN, APPLICATION, ADAPTER_IN)
+                .should().dependOnClassesThat().resideInAnyPackage("software.amazon..")
+                .check(classes);
+        // Anti falso positivo: el adaptador existe y de verdad usa el SDK.
+        assertFalse(classes.that(resideIn("dev.julioflores.cv.infrastructure.adapter.out.storage..")).isEmpty());
+        assertTrue(classes.that(resideIn("dev.julioflores.cv.infrastructure.adapter.out.storage.."))
+                .stream().anyMatch(c -> c.getDirectDependenciesFromSelf().stream()
+                        .anyMatch(d -> d.getTargetClass().getPackageName().startsWith("software.amazon"))));
     }
 
     private static DescribedPredicate<JavaClass> resideIn(String pkg) {

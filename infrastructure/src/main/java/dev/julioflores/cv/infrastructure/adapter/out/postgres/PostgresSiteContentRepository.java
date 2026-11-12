@@ -2,6 +2,7 @@ package dev.julioflores.cv.infrastructure.adapter.out.postgres;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.julioflores.cv.application.port.out.ContentCacheInvalidator;
 import dev.julioflores.cv.application.port.out.SiteContentRepository;
 import dev.julioflores.cv.domain.Architecture;
 import dev.julioflores.cv.domain.Language;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.sql.DataSource;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -26,9 +28,11 @@ import org.jboss.logging.Logger;
  * Lee la versión activa de cada contenido editable (tabla {@code content_version}) con la misma estrategia que el CV:
  * se recuerda {@code cv.content.cache-ttl}, y si la base de datos falla al refrescar se sigue sirviendo lo último leído.
  * Lo que no está publicado se sirve vacío: la web omite esa sección en lugar de fallar.
+ * {@link #invalidate} descarta lo recordado de una clave; solo vale para una instancia de API (con réplicas haría falta
+ * {@code LISTEN/NOTIFY}).
  */
 @ApplicationScoped
-public class PostgresSiteContentRepository implements SiteContentRepository {
+public class PostgresSiteContentRepository implements SiteContentRepository, ContentCacheInvalidator {
 
     private static final Logger LOG = Logger.getLogger(PostgresSiteContentRepository.class);
     private static final String ACTIVE_CONTENT =
@@ -49,6 +53,8 @@ public class PostgresSiteContentRepository implements SiteContentRepository {
     private final long ttlNanos;
     private final Map<Key, Cached> cache = new ConcurrentHashMap<>();
     private final Map<Key, Object> locks = new ConcurrentHashMap<>();
+    /** Época por clave: sube con cada invalidación; un refresco que empezó en otra época no guarda su resultado. */
+    private final Map<Key, AtomicLong> epochs = new ConcurrentHashMap<>();
 
     public PostgresSiteContentRepository(
             DataSource dataSource, ObjectMapper mapper, @ConfigProperty(name = "cv.content.cache-ttl") Duration ttl) {
@@ -80,21 +86,40 @@ public class PostgresSiteContentRepository implements SiteContentRepository {
         }
         // Un candado por contenido: tras caducar, una sola petición consulta la base de datos y el resto espera su resultado.
         synchronized (locks.computeIfAbsent(key, k -> new Object())) {
+            // La época se captura ANTES de leer lo recordado: una invalidación posterior descarta tanto el resultado como lo viejo.
+            long epoch = epoch(key).get();
             cached = cache.get(key);
             if (cached == null || !cached.isFresh()) {
-                cached = refresh(key, cached);
-                cache.put(key, cached);
+                cached = refresh(key, cached, epoch);
+                store(key, epoch, cached);
             }
             return cached.document();
         }
     }
 
-    private Cached refresh(Key key, Cached stale) {
+    /** Guarda el resultado solo si no hubo invalidación desde que empezó la lectura; atómico frente a {@link #invalidate}. */
+    private void store(Key key, long epoch, Cached value) {
+        cache.compute(key, (k, current) -> epoch(k).get() == epoch ? value : current);
+    }
+
+    private AtomicLong epoch(Key key) {
+        return epochs.computeIfAbsent(key, k -> new AtomicLong());
+    }
+
+    @Override
+    public void invalidate(String kind, Language language) {
+        Key key = new Key(kind, language);
+        epoch(key).incrementAndGet();
+        cache.remove(key);
+    }
+
+    private Cached refresh(Key key, Cached stale, long epoch) {
         try {
             Optional<JsonNode> loaded = load(key);
             return new Cached(loaded, System.nanoTime() + (loaded.isPresent() ? ttlNanos : NOT_FOUND_TTL_NANOS));
         } catch (RuntimeException e) {
-            if (stale == null) {
+            // Sin valor previo, o invalidado mientras se refrescaba: lo viejo ya no se puede servir, se propaga el error.
+            if (stale == null || epoch(key).get() != epoch) {
                 throw e;
             }
             LOG.warnf(e, "Cannot refresh the '%s' content in '%s'; serving the last one read", key.kind(), key.language().tag());

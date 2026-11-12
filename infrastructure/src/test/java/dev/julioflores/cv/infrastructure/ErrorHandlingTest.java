@@ -126,4 +126,13 @@ class ErrorHandlingTest {
         given().when().get("/test/boom").then().header("Cache-Control", nullValue());
         given().when().get("/api/v1/experience/nope").then().header("Cache-Control", nullValue());
     }
+
+    @Test
+    void securityForbiddenIsAProblem403() { // extra fuera del plan: mapeo explícito de ForbiddenException
+        given().when().get("/test/boom/forbidden")
+                .then().statusCode(403)
+                .header("Content-Type", containsString(PROBLEM_JSON))
+                .body("code", equalTo("FORBIDDEN"))
+                .body("title", equalTo("Acceso denegado"));
+    }
 }
