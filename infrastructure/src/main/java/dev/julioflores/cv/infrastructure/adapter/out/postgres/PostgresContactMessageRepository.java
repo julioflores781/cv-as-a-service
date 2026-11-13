@@ -12,12 +12,15 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import javax.sql.DataSource;
+import org.jboss.logging.Logger;
 
 /** Guarda los mensajes de contacto en la tabla {@code contact_message}. Un fallo se propaga: no se pierde un mensaje en silencio. */
 @ApplicationScoped
 public class PostgresContactMessageRepository implements ContactMessageRepository {
 
-    private static final String INSERT = "INSERT INTO contact_message (name, email, body, ip_hash) VALUES (?, ?, ?, ?)";
+    private static final Logger LOG = Logger.getLogger(PostgresContactMessageRepository.class);
+
+    private static final String INSERT = "INSERT INTO contact_message (name, email, body, ip_hash) VALUES (?, ?, ?, ?) RETURNING id";
 
     // Nunca se selecciona ip_hash: no hay forma de que llegue hasta la API.
     private static final String COLUMNS = "SELECT id, name, email, body, created_at FROM contact_message";
@@ -41,7 +44,11 @@ public class PostgresContactMessageRepository implements ContactMessageRepositor
             statement.setString(2, message.email());
             statement.setString(3, message.body());
             statement.setString(4, senderKey);
-            statement.executeUpdate();
+            try (ResultSet inserted = statement.executeQuery()) {
+                inserted.next();
+                // Solo el id: ni nombre, ni correo, ni cuerpo ni la clave del remitente.
+                LOG.infof("Contact message stored id=%d", inserted.getLong(1));
+            }
         } catch (SQLException e) {
             throw new IllegalStateException("Could not save the contact message", e);
         }

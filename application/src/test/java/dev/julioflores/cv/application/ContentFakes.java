@@ -43,6 +43,9 @@ final class ContentFakes {
     static final class FakeVersions implements ContentVersionRepository {
         final List<Row> rows = new ArrayList<>();
         RuntimeException failOnPublish;
+        int activeCalls;
+        /** Las lecturas de la versión activa a partir de la n+1 fallan (-1: nunca). */
+        int failActiveAfter = -1;
         int publishCalls;
         int activateCalls;
         String lastComment;
@@ -64,6 +67,9 @@ final class ContentFakes {
 
         @Override
         public Optional<ContentVersion> active(ContentKind kind, Language language) {
+            if (failActiveAfter >= 0 && ++activeCalls > failActiveAfter) {
+                throw new IllegalStateException("read failed");
+            }
             return rows.stream().filter(r -> r.kind == kind && r.language == language && r.active).findFirst().map(this::view);
         }
 

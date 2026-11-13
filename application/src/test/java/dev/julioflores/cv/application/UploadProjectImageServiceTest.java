@@ -5,11 +5,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.julioflores.cv.application.AdminFakes.RecordingAuditLog;
+import dev.julioflores.cv.application.audit.AuditAction;
 import dev.julioflores.cv.application.error.ErrorCode;
 import dev.julioflores.cv.application.image.UploadedImage;
 import dev.julioflores.cv.application.service.ImageStorageUnavailableException;
 import dev.julioflores.cv.application.service.UploadProjectImageService;
 import dev.julioflores.cv.application.error.ApplicationException;
+import java.util.Map;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 
@@ -19,7 +22,8 @@ class UploadProjectImageServiceTest {
             "site/projects/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.(jpg|png)");
 
     private final ImageFakes.Storage storage = new ImageFakes.Storage();
-    private final UploadProjectImageService service = new UploadProjectImageService(storage);
+    private final RecordingAuditLog audit = new RecordingAuditLog();
+    private final UploadProjectImageService service = new UploadProjectImageService(storage, audit);
 
     private ErrorCode codeOf(byte[] content) {
         return assertThrows(ApplicationException.class, () -> service.upload(content)).code();
@@ -91,5 +95,23 @@ class UploadProjectImageServiceTest {
 
         storage.failure = new ImageStorageUnavailableException("not configured");
         assertEquals(ErrorCode.IMAGE_STORAGE_UNAVAILABLE, codeOf(ImageSamples.png(5, 5)));
+    }
+
+    @Test
+    void aValidUploadRecordsKeyTypeBytesAndDimensions() { // T40
+        UploadedImage uploaded = service.upload(ImageSamples.jpeg(1280, 720, 100 * 1024));
+        assertEquals(RecordingAuditLog.success(AuditAction.IMAGE_UPLOADED, Map.of("key", uploaded.key(),
+                "content_type", "image/jpeg", "bytes", "102400", "width", "1280", "height", "720")), audit.only());
+    }
+
+    @Test
+    void invalidTooLargeUnsupportedOrFailingStorageUploadsRecordNothing() { // T40 (negativos)
+        codeOf(new byte[0]);
+        codeOf(ImageSamples.jpeg(10, 10, 5 * 1024 * 1024 + 1));
+        codeOf(ImageSamples.svg());
+        storage.failure = new IllegalStateException("boom");
+        assertThrows(ImageStorageUnavailableException.class, () -> service.upload(ImageSamples.png(5, 5)));
+        storage.failure = null;
+        assertEquals(java.util.List.of(), audit.events);
     }
 }

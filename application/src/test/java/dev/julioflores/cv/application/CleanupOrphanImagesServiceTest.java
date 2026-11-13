@@ -3,6 +3,8 @@ package dev.julioflores.cv.application;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.julioflores.cv.application.AdminFakes.RecordingAuditLog;
+import dev.julioflores.cv.application.audit.AuditAction;
 import dev.julioflores.cv.application.image.CleanupResult;
 import dev.julioflores.cv.application.service.CleanupOrphanImagesService;
 import java.time.Clock;
@@ -10,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class CleanupOrphanImagesServiceTest {
@@ -18,8 +21,9 @@ class CleanupOrphanImagesServiceTest {
 
     private final ImageFakes.Storage storage = new ImageFakes.Storage();
     private final ImageFakes.References references = new ImageFakes.References();
+    private final RecordingAuditLog audit = new RecordingAuditLog();
     private final CleanupOrphanImagesService service =
-            new CleanupOrphanImagesService(storage, references, Clock.fixed(NOW, ZoneOffset.UTC));
+            new CleanupOrphanImagesService(storage, references, audit, Clock.fixed(NOW, ZoneOffset.UTC));
 
     private static String key(int n) {
         return String.format("site/projects/00000000-0000-4000-8000-%012d.png", n);
@@ -90,5 +94,40 @@ class CleanupOrphanImagesServiceTest {
         age(1, 48);
         assertEquals(List.of(key(1)), service.cleanup(false, 24).deleted());
         assertTrue(storage.objects.containsKey("site/projects/notes.txt"));
+    }
+
+    @Test
+    void aRealCleanupAndADryRunRecordTheirCounters() { // T42
+        age(1, 48);
+        age(2, 72);
+        age(3, 2); // dentro de la gracia
+        references.keys.add(key(3));
+
+        service.cleanup(true, 24);
+        assertEquals(RecordingAuditLog.success(AuditAction.IMAGES_CLEANUP, Map.of("dry_run", "true", "older_than_hours", "24",
+                "deleted", "0", "would_delete", "2", "kept", "1")), audit.only());
+        audit.events.clear();
+
+        service.cleanup(false, 24);
+        assertEquals(RecordingAuditLog.success(AuditAction.IMAGES_CLEANUP, Map.of("dry_run", "false", "older_than_hours", "24",
+                "deleted", "2", "would_delete", "0", "kept", "1")), audit.only());
+    }
+
+    @Test
+    void theRecordedGraceIsTheEffectiveOneAndAFailingStorageRecordsNothing() { // extra fuera del plan
+        service.cleanup(true, 0);
+        assertEquals("1", audit.only().details().get("older_than_hours"));
+        audit.events.clear();
+        storage.failure = new IllegalStateException("boom");
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> service.cleanup(false, 24));
+        assertTrue(audit.events.isEmpty());
+    }
+
+    @Test
+    void ifDeleteAllFailsNoCleanupIsRecorded() { // R2: el éxito se emite DESPUÉS del borrado real
+        age(1, 48);
+        storage.failOnDelete = new IllegalStateException("boom");
+        org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> service.cleanup(false, 24));
+        assertTrue(audit.events.isEmpty());
     }
 }

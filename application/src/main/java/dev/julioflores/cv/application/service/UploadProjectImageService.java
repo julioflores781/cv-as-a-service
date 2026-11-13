@@ -1,7 +1,10 @@
 package dev.julioflores.cv.application.service;
 
+import dev.julioflores.cv.application.audit.AuditAction;
+import dev.julioflores.cv.application.audit.AuditEvent;
 import dev.julioflores.cv.application.image.UploadedImage;
 import dev.julioflores.cv.application.port.in.UploadProjectImageUseCase;
+import dev.julioflores.cv.application.port.out.AuditLog;
 import dev.julioflores.cv.application.port.out.FileStoragePort;
 import dev.julioflores.cv.domain.ImageDimensions;
 import dev.julioflores.cv.domain.ImageFormat;
@@ -17,9 +20,11 @@ public class UploadProjectImageService implements UploadProjectImageUseCase {
     public static final String CACHE_CONTROL = "public, max-age=31536000, immutable";
 
     private final FileStoragePort storage;
+    private final AuditLog audit;
 
-    public UploadProjectImageService(FileStoragePort storage) {
+    public UploadProjectImageService(FileStoragePort storage, AuditLog audit) {
         this.storage = storage;
+        this.audit = audit;
     }
 
     @Override
@@ -46,6 +51,8 @@ public class UploadProjectImageService implements UploadProjectImageUseCase {
         } catch (RuntimeException e) {
             throw new ImageStorageUnavailableException(e.getClass().getSimpleName(), e);
         }
+        audit.record(AuditEvent.success(AuditAction.IMAGE_UPLOADED, "key", key, "content_type", format.mediaType(),
+                "bytes", content.length, "width", size.width(), "height", size.height()));
         return new UploadedImage(key, url, format.mediaType(), content.length, size.width(), size.height());
     }
 }

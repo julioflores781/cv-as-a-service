@@ -8,6 +8,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.julioflores.cv.application.AdminFakes.RecordingAuditLog;
+import dev.julioflores.cv.application.audit.AuditAction;
+
 import dev.julioflores.cv.application.ContentFakes.FakeVersions;
 import dev.julioflores.cv.application.ContentFakes.RecordingInvalidator;
 import dev.julioflores.cv.application.content.ContentKind;
@@ -33,6 +36,7 @@ class SaveEditableContentServiceTest {
     private FakeVersions versions;
     private RecordingInvalidator cache;
     private SaveEditableContentService service;
+    private final RecordingAuditLog audit = new RecordingAuditLog();
 
     @BeforeEach
     void setUp() {
@@ -41,7 +45,7 @@ class SaveEditableContentServiceTest {
                 .seed(ContentKind.SERVICES, Language.EN, 3, true, services("en"));
         cache = new RecordingInvalidator();
         cache.watching = versions;
-        service = new SaveEditableContentService(versions, cache);
+        service = new SaveEditableContentService(versions, cache, audit);
     }
 
     private static SaveContentCommand command(int baseEs, int baseEn, Map<String, Object> es, Map<String, Object> en) {
@@ -172,5 +176,60 @@ class SaveEditableContentServiceTest {
         var e = assertThrows(ContentNotFoundException.class,
                 () -> service.save("resume", command(1, 1, services("es"), services("en"))));
         assertEquals(ErrorCode.NOT_FOUND, e.code());
+    }
+
+    @Test
+    void aValidSaveRecordsTheVersionsAndOnlyTheCommentLengthNeverTheTextOrTheContent() { // T38
+        service.save("services", command(3, 3, changed("es", "TituloUnicoXyz"), changed("en", "UniqueTitleXyz")));
+
+        assertEquals(RecordingAuditLog.success(AuditAction.CONTENT_SAVED, Map.of("kind", "services", "es_version", "4",
+                "en_version", "4", "comment_present", "true", "comment_length", "16")), audit.only());
+        String logged = audit.everything();
+        assertFalse(logged.contains("Cambio de precio"), "el comentario no se registra");
+        assertFalse(logged.contains("TituloUnicoXyz") || logged.contains("UniqueTitleXyz"), "el contenido no se registra");
+    }
+
+    @Test
+    void invalidParityConflictAndRepositoryFailuresRecordNothing() { // T38 (negativos)
+        Map<String, Object> bad = services("es");
+        ((Map<String, Object>) ((List<Object>) bad.get("services")).get(0)).put("id", "NO VALE");
+        assertThrows(ContentInvalidException.class, () -> service.save("services", command(3, 3, bad, services("en"))));
+
+        Map<String, Object> shorter = services("en");
+        ((List<Object>) shorter.get("services")).remove(1);
+        assertThrows(ContentParityBrokenException.class, () -> service.save("services", command(3, 3, services("es"), shorter)));
+
+        assertThrows(ContentVersionConflictException.class,
+                () -> service.save("services", command(2, 3, services("es"), services("en"))));
+        assertThrows(ContentNotFoundException.class,
+                () -> service.save("resume", command(1, 1, services("es"), services("en"))));
+
+        versions.failOnPublish = new IllegalStateException("db down");
+        assertThrows(IllegalStateException.class, () -> service.save("services", command(3, 3, services("es"), services("en"))));
+
+        assertEquals(List.of(), audit.events);
+    }
+
+    @Test
+    void aSaveWithoutCommentRecordsItAsAbsentWithLengthZeroAndCountsCodePoints() { // extra fuera del plan
+        service.save("services", new SaveContentCommand(3, 3, "   ", services("es"), services("en")));
+        assertEquals(Map.of("kind", "services", "es_version", "4", "en_version", "4", "comment_present", "false",
+                "comment_length", "0"), audit.only().details());
+        audit.events.clear();
+        service.save("services", new SaveContentCommand(4, 4, "  \uD83D\uDE00ab  ", services("es"), services("en")));
+        assertEquals("3", audit.only().details().get("comment_length"), "cuenta puntos de código, no unidades UTF-16");
+    }
+
+    @Test
+    void aFailingReadAfterPublishingStillRecordsTheSaveWithoutVersionsAndRethrows() { // R1 de la ronda 1
+        versions.failActiveAfter = 0;
+
+        var e = assertThrows(IllegalStateException.class,
+                () -> service.save("services", command(3, 3, changed("es", "Nuevo"), changed("en", "New"))));
+
+        assertEquals("read failed", e.getMessage());
+        assertEquals(4, versions.rows.size(), "el guardado sí se publicó");
+        assertEquals(RecordingAuditLog.success(AuditAction.CONTENT_SAVED,
+                Map.of("kind", "services", "comment_present", "true", "comment_length", "16")), audit.only());
     }
 }

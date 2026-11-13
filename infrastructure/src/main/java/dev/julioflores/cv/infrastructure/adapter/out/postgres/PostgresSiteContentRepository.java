@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.julioflores.cv.application.port.out.ContentCacheInvalidator;
 import dev.julioflores.cv.application.port.out.SiteContentRepository;
 import dev.julioflores.cv.domain.Architecture;
+import dev.julioflores.cv.infrastructure.config.ErrorLogDescription;
 import dev.julioflores.cv.domain.Language;
 import dev.julioflores.cv.domain.Project;
 import dev.julioflores.cv.domain.ServiceOffer;
@@ -111,6 +112,7 @@ public class PostgresSiteContentRepository implements SiteContentRepository, Con
         Key key = new Key(kind, language);
         epoch(key).incrementAndGet();
         cache.remove(key);
+        LOG.infof("Content cache invalidated kind=%s lang=%s", kind, language.tag());
     }
 
     private Cached refresh(Key key, Cached stale, long epoch) {
@@ -122,7 +124,10 @@ public class PostgresSiteContentRepository implements SiteContentRepository, Con
             if (stale == null || epoch(key).get() != epoch) {
                 throw e;
             }
-            LOG.warnf(e, "Cannot refresh the '%s' content in '%s'; serving the last one read", key.kind(), key.language().tag());
+            // Sin mensaje ni traza de errores SQL/JDBC (pueden llevar host, URL o filas): ver ErrorLogDescription.
+            ErrorLogDescription.Described described = ErrorLogDescription.describe(e);
+            LOG.warnf(described.thrown(), "Cannot refresh the '%s' content in '%s' (%s); serving the last one read",
+                    key.kind(), key.language().tag(), described.message());
             return new Cached(stale.document(), System.nanoTime() + ttlNanos);
         }
     }

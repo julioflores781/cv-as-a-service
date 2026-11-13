@@ -148,6 +148,33 @@ class ArchitectureTest {
                         .anyMatch(d -> d.getTargetClass().getPackageName().startsWith("software.amazon"))));
     }
 
+    private static final String AUDIT_ADAPTER = "dev.julioflores.cv.infrastructure.adapter.out.audit..";
+
+    @Test
+    void onlyTheAuditAdapterImplementsAuditLogAndApplicationOnlyKnowsTheInterface() { // T54
+        classes().that().implement("dev.julioflores.cv.application.port.out.AuditLog")
+                .should().resideInAPackage(AUDIT_ADAPTER)
+                .check(classes);
+        noClasses().that().resideInAPackage(APPLICATION)
+                .should().dependOnClassesThat().resideInAPackage(AUDIT_ADAPTER)
+                .check(classes);
+        // Anti falso positivo: el puerto es una interfaz, el adaptador existe y de verdad lo implementa, y los servicios lo usan.
+        JavaClass port = classes.get("dev.julioflores.cv.application.port.out.AuditLog");
+        assertTrue(port.isInterface());
+        assertFalse(classes.that(resideIn(AUDIT_ADAPTER)).isEmpty(), "adapter.out.audit not imported");
+        assertTrue(classes.that(resideIn(AUDIT_ADAPTER)).stream().anyMatch(c -> c.isAssignableTo(port.getName())));
+        assertTrue(classes.that(resideIn("dev.julioflores.cv.application.service..")).stream()
+                .anyMatch(c -> c.getDirectDependenciesFromSelf().stream().anyMatch(d -> d.getTargetClass().isEquivalentTo(port.reflect()))));
+    }
+
+    @Test
+    void theRequestContextHandlerLivesInConfig() { // T54
+        JavaClass handler = classes.get("dev.julioflores.cv.infrastructure.config.RequestContextHandler");
+        assertTrue(handler.getPackageName().equals("dev.julioflores.cv.infrastructure.config"));
+        classes().that().haveSimpleName("RequestContextHandler").should().resideInAPackage(CONFIG).check(classes);
+        assertFalse(classes.that(resideIn(CONFIG)).isEmpty());
+    }
+
     private static DescribedPredicate<JavaClass> resideIn(String pkg) {
         return JavaClass.Predicates.resideInAPackage(pkg);
     }

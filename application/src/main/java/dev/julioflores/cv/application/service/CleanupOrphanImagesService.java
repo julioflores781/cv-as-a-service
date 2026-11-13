@@ -1,8 +1,11 @@
 package dev.julioflores.cv.application.service;
 
+import dev.julioflores.cv.application.audit.AuditAction;
+import dev.julioflores.cv.application.audit.AuditEvent;
 import dev.julioflores.cv.application.image.CleanupResult;
 import dev.julioflores.cv.application.image.StoredObject;
 import dev.julioflores.cv.application.port.in.CleanupOrphanImagesUseCase;
+import dev.julioflores.cv.application.port.out.AuditLog;
 import dev.julioflores.cv.application.port.out.FileStoragePort;
 import dev.julioflores.cv.application.port.out.ImageReferenceRepository;
 import dev.julioflores.cv.domain.ImageKey;
@@ -20,17 +23,21 @@ public class CleanupOrphanImagesService implements CleanupOrphanImagesUseCase {
 
     private final FileStoragePort storage;
     private final ImageReferenceRepository references;
+    private final AuditLog audit;
     private final Clock clock;
 
-    public CleanupOrphanImagesService(FileStoragePort storage, ImageReferenceRepository references, Clock clock) {
+    public CleanupOrphanImagesService(
+            FileStoragePort storage, ImageReferenceRepository references, AuditLog audit, Clock clock) {
         this.storage = storage;
         this.references = references;
+        this.audit = audit;
         this.clock = clock;
     }
 
     @Override
     public CleanupResult cleanup(boolean dryRun, int olderThanHours) {
-        Instant limit = clock.instant().minus(Duration.ofHours(Math.max(MIN_GRACE_HOURS, olderThanHours)));
+        int graceHours = Math.max(MIN_GRACE_HOURS, olderThanHours);
+        Instant limit = clock.instant().minus(Duration.ofHours(graceHours));
         List<StoredObject> objects = Storage.call(() -> storage.list(ImageKey.PREFIX));
         Set<String> referenced = references.referencedKeys();
         List<String> orphans = new ArrayList<>();
@@ -46,12 +53,19 @@ public class CleanupOrphanImagesService implements CleanupOrphanImagesUseCase {
             }
         }
         if (dryRun) {
+            record(true, graceHours, 0, orphans.size(), kept);
             return new CleanupResult(true, List.of(), List.copyOf(orphans), kept);
         }
         for (int from = 0; from < orphans.size(); from += FileStoragePort.MAX_DELETE_BATCH) {
             List<String> batch = orphans.subList(from, Math.min(orphans.size(), from + FileStoragePort.MAX_DELETE_BATCH));
             Storage.run(() -> storage.deleteAll(List.copyOf(batch)));
         }
+        record(false, graceHours, orphans.size(), 0, kept);
         return new CleanupResult(false, List.copyOf(orphans), List.of(), kept);
+    }
+
+    private void record(boolean dryRun, int graceHours, int deleted, int wouldDelete, int kept) {
+        audit.record(AuditEvent.success(AuditAction.IMAGES_CLEANUP, "dry_run", dryRun, "older_than_hours", graceHours,
+                "deleted", deleted, "would_delete", wouldDelete, "kept", kept));
     }
 }

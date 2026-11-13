@@ -1,5 +1,6 @@
 package dev.julioflores.cv.infrastructure.adapter.in.rest;
 
+import dev.julioflores.cv.infrastructure.config.AdminRoutes;
 import dev.julioflores.cv.application.port.in.VerifyAdminSessionUseCase;
 import dev.julioflores.cv.application.service.AdminUnauthorizedException;
 import jakarta.ws.rs.container.ContainerRequestContext;
@@ -23,7 +24,7 @@ public class AdminSessionFilter {
     @ServerRequestFilter
     public void check(ContainerRequestContext request) {
         String path = AdminPaths.normalized(request);
-        if (!AdminPaths.isAdmin(path) || path.equals(AdminPaths.LOGIN_PATH)) {
+        if (!AdminRoutes.isAdmin(path) || path.equals(AdminPaths.LOGIN_PATH)) {
             return;
         }
         Principal principal = request.getSecurityContext().getUserPrincipal();

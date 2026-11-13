@@ -19,7 +19,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.UUID;
+import java.util.logging.Level;
+import org.jboss.logmanager.ExtLogRecord;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.Test;
 
@@ -141,6 +144,96 @@ class ContactMessagesResourceTest {
     void withoutTheCloudflareHeaderTheSocketAddressIsUsed() {
         given().contentType(ContentType.JSON).body(json("Ada", "ada-socket@example.com", BODY, null))
                 .when().post(PATH).then().statusCode(org.hamcrest.Matchers.anyOf(equalTo(201), equalTo(429)));
+    }
+
+    private static final String STORED_LOGGER = "dev.julioflores.cv.infrastructure.adapter.out.postgres.PostgresContactMessageRepository";
+
+    private static String requestId() {
+        return "ct-" + UUID.randomUUID().toString().replace("-", "");
+    }
+
+    private static ValidatableResponse postWithRid(String ip, String rid, String body) {
+        return given().header("CF-Connecting-IP", ip).header("X-Request-Id", rid).contentType(ContentType.JSON).body(body)
+                .when().post(PATH).then();
+    }
+
+    /** Líneas «stored» de esta petición: se espera a la de access (sale al cerrar la respuesta) y después se mira, sin sleeps. */
+    private static List<ExtLogRecord> storedFor(LogRecords logs, String rid, String accessPrefix) {
+        logs.awaitAccessLine(accessPrefix, rid);
+        return logs.byLogger(STORED_LOGGER).stream().filter(r -> rid.equals(LogRecords.mdc(r, "request_id"))).toList();
+    }
+
+    private long idOf(String email) throws SQLException {
+        try (Connection c = dataSource.getConnection();
+                PreparedStatement s = c.prepareStatement("SELECT id FROM contact_message WHERE email = ?")) {
+            s.setString(1, email);
+            try (ResultSet rs = s.executeQuery()) {
+                rs.next();
+                return rs.getLong(1);
+            }
+        }
+    }
+
+    // T56
+    @Test
+    void aValidMessageLeavesOneStoredLineWithTheRequestIdAndNoPersonalData() throws SQLException {
+        String email = UUID.randomUUID() + "@example.com";
+        String ip = freshIp();
+        String rid = requestId();
+        try (LogRecords logs = LogRecords.attach()) {
+            postWithRid(ip, rid, json("Canary Nombre", email, "Canary mensaje largo de prueba", "")).statusCode(201);
+            List<ExtLogRecord> stored = storedFor(logs, rid, "POST /api/v1/contact/messages 201");
+            assertEquals(1, stored.size(), logs.dump());
+            ExtLogRecord line = stored.get(0);
+            assertEquals(Level.INFO.intValue(), line.getLevel().intValue());
+            assertEquals("Contact message stored id=" + idOf(email), line.getFormattedMessage());
+            String dump = logs.dump();
+            for (String leak : new String[] {"Canary Nombre", email, "Canary mensaje", ip, "203.0.113."}) {
+                assertFalse(dump.contains(leak), leak + " in " + dump);
+            }
+        }
+    }
+
+    // T57
+    @Test
+    void theHoneypotAnswers201AndLeavesNeitherAStoredLineNorATelegramOne() throws SQLException {
+        String email = UUID.randomUUID() + "@example.com";
+        String rid = requestId();
+        try (LogRecords logs = LogRecords.attach()) {
+            postWithRid(freshIp(), rid, json("Bot", email, BODY, "http://spam.example")).statusCode(201);
+            assertTrue(storedFor(logs, rid, "POST /api/v1/contact/messages 201").isEmpty(), logs.dump());
+            assertFalse(logs.dump().contains("stored id="), logs.dump());
+            assertFalse(logs.dump().contains("Telegram"), logs.dump());
+            assertEquals(0, countByEmail(email));
+        }
+    }
+
+    // T58
+    @Test
+    void anExhaustedQuotaAnswers429WithTheCodeInTheAccessLineAndNoStoredLine() {
+        String busy = freshIp();
+        for (int i = 0; i < 3; i++) {
+            post(busy, json("Ada", "ada@example.com", BODY, null)).statusCode(201);
+        }
+        String rid = requestId();
+        try (LogRecords logs = LogRecords.attach()) {
+            postWithRid(busy, rid, json("Ada", "ada@example.com", BODY, null)).statusCode(429);
+            String line = logs.awaitAccessLine("POST /api/v1/contact/messages 429", rid);
+            assertTrue(line.contains(" err=CONTACT_RATE_LIMITED "), line);
+            assertTrue(storedFor(logs, rid, "POST /api/v1/contact/messages 429").isEmpty(), logs.dump());
+        }
+    }
+
+    // T59
+    @Test
+    void anInvalidMessageAnswers400AndLeavesNoStoredLine() {
+        String rid = requestId();
+        try (LogRecords logs = LogRecords.attach()) {
+            postWithRid(freshIp(), rid, json("Ada", "no-es-un-correo", BODY, null)).statusCode(400);
+            String line = logs.awaitAccessLine("POST /api/v1/contact/messages 400", rid);
+            assertTrue(line.contains(" err=CONTACT_INVALID "), line);
+            assertTrue(storedFor(logs, rid, "POST /api/v1/contact/messages 400").isEmpty(), logs.dump());
+        }
     }
 
     @TestHTTPResource(PATH)

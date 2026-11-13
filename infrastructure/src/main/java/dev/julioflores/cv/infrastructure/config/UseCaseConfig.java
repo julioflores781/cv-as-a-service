@@ -27,6 +27,7 @@ import dev.julioflores.cv.application.port.in.SubmitContactMessageUseCase;
 import dev.julioflores.cv.application.port.in.TranslateHl7UseCase;
 import dev.julioflores.cv.application.port.in.VerifyAdminSessionUseCase;
 import dev.julioflores.cv.application.port.out.AdminAccountRepository;
+import dev.julioflores.cv.application.port.out.AuditLog;
 import dev.julioflores.cv.application.port.out.ContactMessageRepository;
 import dev.julioflores.cv.application.port.out.ContactNotifier;
 import dev.julioflores.cv.application.port.out.ContentCacheInvalidator;
@@ -124,8 +125,8 @@ public class UseCaseConfig {
 
     @Produces
     @ApplicationScoped
-    ListContactMessagesUseCase listContactMessages(ContactMessageRepository messages) {
-        return new ListContactMessagesService(messages);
+    ListContactMessagesUseCase listContactMessages(ContactMessageRepository messages, AuditLog audit) {
+        return new ListContactMessagesService(messages, audit);
     }
 
     @Produces
@@ -168,10 +169,11 @@ public class UseCaseConfig {
             PasswordHasher hasher,
             SessionTokenIssuer issuer,
             @Named(RateLimiterConfig.ADMIN_LOGIN) RateLimiter globalLimiter,
+            AuditLog audit,
             Clock clock,
             AdminConfig config) {
         return new LoginAdminService(
-                accounts, hasher, issuer, globalLimiter, clock, config.maxFailures(), config.lock());
+                accounts, hasher, issuer, globalLimiter, audit, clock, config.maxFailures(), config.lock());
     }
 
     @Produces
@@ -186,15 +188,16 @@ public class UseCaseConfig {
             AdminAccountRepository accounts,
             PasswordHasher hasher,
             SessionTokenIssuer issuer,
+            AuditLog audit,
             Clock clock,
             AdminConfig config) {
-        return new ChangeAdminPasswordService(accounts, hasher, issuer, clock, config.maxFailures(), config.lock());
+        return new ChangeAdminPasswordService(accounts, hasher, issuer, audit, clock, config.maxFailures(), config.lock());
     }
 
     @Produces
     @ApplicationScoped
-    LogoutAllSessionsUseCase logoutAllSessions(AdminAccountRepository accounts) {
-        return new LogoutAllSessionsService(accounts);
+    LogoutAllSessionsUseCase logoutAllSessions(AdminAccountRepository accounts, AuditLog audit) {
+        return new LogoutAllSessionsService(accounts, audit);
     }
 
     @Produces
@@ -205,8 +208,9 @@ public class UseCaseConfig {
 
     @Produces
     @ApplicationScoped
-    SaveEditableContentUseCase saveEditableContent(ContentVersionRepository versions, ContentCacheInvalidator cache) {
-        return new SaveEditableContentService(versions, cache);
+    SaveEditableContentUseCase saveEditableContent(
+            ContentVersionRepository versions, ContentCacheInvalidator cache, AuditLog audit) {
+        return new SaveEditableContentService(versions, cache, audit);
     }
 
     @Produces
@@ -223,14 +227,15 @@ public class UseCaseConfig {
 
     @Produces
     @ApplicationScoped
-    RollbackContentUseCase rollbackContent(ContentVersionRepository versions, ContentCacheInvalidator cache) {
-        return new RollbackContentService(versions, cache);
+    RollbackContentUseCase rollbackContent(
+            ContentVersionRepository versions, ContentCacheInvalidator cache, AuditLog audit) {
+        return new RollbackContentService(versions, cache, audit);
     }
 
     @Produces
     @ApplicationScoped
-    UploadProjectImageUseCase uploadProjectImage(FileStoragePort storage) {
-        return new UploadProjectImageService(storage);
+    UploadProjectImageUseCase uploadProjectImage(FileStoragePort storage, AuditLog audit) {
+        return new UploadProjectImageService(storage, audit);
     }
 
     @Produces
@@ -241,14 +246,15 @@ public class UseCaseConfig {
 
     @Produces
     @ApplicationScoped
-    DeleteImageUseCase deleteImage(FileStoragePort storage, ImageReferenceRepository references) {
-        return new DeleteImageService(storage, references);
+    DeleteImageUseCase deleteImage(
+            FileStoragePort storage, ImageReferenceRepository references, AuditLog audit) {
+        return new DeleteImageService(storage, references, audit);
     }
 
     @Produces
     @ApplicationScoped
     CleanupOrphanImagesUseCase cleanupOrphanImages(
-            FileStoragePort storage, ImageReferenceRepository references, Clock clock) {
-        return new CleanupOrphanImagesService(storage, references, clock);
+            FileStoragePort storage, ImageReferenceRepository references, AuditLog audit, Clock clock) {
+        return new CleanupOrphanImagesService(storage, references, audit, clock);
     }
 }
