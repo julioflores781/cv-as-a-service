@@ -1,5 +1,7 @@
 package dev.julioflores.cv.application.service;
 
+import dev.julioflores.cv.application.audit.AuditAction;
+import dev.julioflores.cv.application.audit.AuditEvent;
 import dev.julioflores.cv.application.content.ContentKind;
 import dev.julioflores.cv.application.content.ContentParity;
 import dev.julioflores.cv.application.content.ContentValidator;
@@ -8,6 +10,7 @@ import dev.julioflores.cv.application.content.SaveContentCommand;
 import dev.julioflores.cv.application.content.Violation;
 import dev.julioflores.cv.application.content.ViolationCode;
 import dev.julioflores.cv.application.port.in.SaveEditableContentUseCase;
+import dev.julioflores.cv.application.port.out.AuditLog;
 import dev.julioflores.cv.application.port.out.ContentCacheInvalidator;
 import dev.julioflores.cv.application.port.out.ContentVersionRepository;
 import dev.julioflores.cv.domain.Language;
@@ -22,10 +25,12 @@ public class SaveEditableContentService implements SaveEditableContentUseCase {
 
     private final ContentVersionRepository versions;
     private final ContentCacheInvalidator cache;
+    private final AuditLog audit;
 
-    public SaveEditableContentService(ContentVersionRepository versions, ContentCacheInvalidator cache) {
+    public SaveEditableContentService(ContentVersionRepository versions, ContentCacheInvalidator cache, AuditLog audit) {
         this.versions = versions;
         this.cache = cache;
+        this.audit = audit;
     }
 
     @Override
@@ -58,7 +63,25 @@ public class SaveEditableContentService implements SaveEditableContentUseCase {
         for (Language language : Language.values()) {
             invalidate(kind, language);
         }
-        return ContentRequests.load(versions, kind);
+        // El guardado ya está publicado: se audita aunque la relectura falle (entonces sin las versiones, que no se conocen).
+        boolean hasComment = comment != null;
+        int commentLength = hasComment ? comment.codePointCount(0, comment.length()) : 0;
+        EditableContent saved;
+        try {
+            saved = ContentRequests.load(versions, kind);
+        } catch (RuntimeException e) {
+            audit.record(AuditEvent.success(AuditAction.CONTENT_SAVED,
+                    "kind", kind.value(), "comment_present", hasComment, "comment_length", commentLength));
+            throw e;
+        }
+        // Solo si hay comentario y su longitud: el texto es libre y no se registra.
+        audit.record(AuditEvent.success(AuditAction.CONTENT_SAVED,
+                "kind", kind.value(),
+                "es_version", saved.es().version(),
+                "en_version", saved.en().version(),
+                "comment_present", hasComment,
+                "comment_length", commentLength));
+        return saved;
     }
 
     /** El guardado ya está hecho: si la caché no se puede invalidar, lo peor es esperar a su TTL; solo se avisa. */

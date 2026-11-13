@@ -57,6 +57,17 @@ public class AdminTestSupport {
         }
     }
 
+    public String queryString(String sql) {
+        try (Connection c = dataSource.getConnection();
+                PreparedStatement s = c.prepareStatement(sql);
+                var rs = s.executeQuery()) {
+            rs.next();
+            return rs.getString(1);
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
     public int queryInt(String sql) {
         try (Connection c = dataSource.getConnection();
                 PreparedStatement s = c.prepareStatement(sql);

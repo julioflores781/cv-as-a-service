@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.julioflores.cv.application.AdminFakes.RecordingAuditLog;
+import dev.julioflores.cv.application.audit.AuditAction;
+
 import dev.julioflores.cv.application.ContentFakes.FakeVersions;
 import dev.julioflores.cv.application.ContentFakes.RecordingInvalidator;
 import dev.julioflores.cv.application.content.ContentKind;
@@ -31,6 +34,7 @@ class RollbackContentServiceTest {
     private FakeVersions versions;
     private RecordingInvalidator cache;
     private RollbackContentService service;
+    private final RecordingAuditLog audit = new RecordingAuditLog();
 
     @BeforeEach
     void setUp() {
@@ -41,7 +45,7 @@ class RollbackContentServiceTest {
         versions.seed(ContentKind.SERVICES, Language.ES, 5, true, services("es"));
         versions.seed(ContentKind.SERVICES, Language.EN, 1, true, services("en"));
         cache = new RecordingInvalidator();
-        service = new RollbackContentService(versions, cache);
+        service = new RollbackContentService(versions, cache, audit);
     }
 
     @Test
@@ -119,5 +123,33 @@ class RollbackContentServiceTest {
         assertThrows(ContentNotFoundException.class, () -> service.rollback("services", "fr", 5, 2));
         assertThrows(ContentNotFoundException.class, () -> service.rollback("services", "ES", 5, 2));
         assertTrue(projects("es").containsKey("projects"));
+    }
+
+    @Test
+    void aRollbackRecordsKindLanguageAndBothVersionsEvenIfTheCacheFails() { // T39
+        cache.failWith = new IllegalStateException("cache boom");
+        service.rollback("services", "es", 5, 2);
+        assertEquals(RecordingAuditLog.success(AuditAction.CONTENT_ROLLED_BACK,
+                Map.of("kind", "services", "lang", "es", "from_version", "5", "to_version", "2")), audit.only());
+    }
+
+    @Test
+    void conflictMissingVersionAndInvalidSnapshotRecordNothing() { // T39 (negativos)
+        assertThrows(ContentVersionConflictException.class, () -> service.rollback("services", "es", 3, 2));
+        assertThrows(ContentVersionNotFoundException.class, () -> service.rollback("services", "es", 5, 4));
+        Map<String, Object> old = services("es");
+        ((Map<String, Object>) ((List<Object>) old.get("services")).get(0)).put("price", Map.of("from", -5, "currency", "EUR"));
+        versions.seed(ContentKind.SERVICES, Language.ES, 6, false, old);
+        assertThrows(ContentInvalidException.class, () -> service.rollback("services", "es", 5, 6));
+        assertThrows(ContentNotFoundException.class, () -> service.rollback("resume", "es", 5, 2));
+        assertEquals(List.of(), audit.events);
+    }
+
+    @Test
+    void aFailingReadAfterActivatingStillRecordsTheRollbackAndRethrows() { // revisión R1: mismo patrón
+        versions.failActiveAfter = 1; // la 1.ª lectura (comprobar la base) funciona; la de después del cambio falla
+        assertThrows(IllegalStateException.class, () -> service.rollback("services", "es", 5, 2));
+        assertEquals(RecordingAuditLog.success(AuditAction.CONTENT_ROLLED_BACK,
+                Map.of("kind", "services", "lang", "es", "from_version", "5", "to_version", "2")), audit.only());
     }
 }

@@ -4,12 +4,15 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.julioflores.cv.application.AdminFakes.RecordingAuditLog;
+import dev.julioflores.cv.application.audit.AuditAction;
 import dev.julioflores.cv.application.error.ErrorCode;
 import dev.julioflores.cv.application.service.DeleteImageService;
 import dev.julioflores.cv.application.service.ImageInUseException;
 import dev.julioflores.cv.application.service.ImageNotFoundException;
 import dev.julioflores.cv.application.service.ImageStorageUnavailableException;
 import java.time.Instant;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class DeleteImageServiceTest {
@@ -19,7 +22,8 @@ class DeleteImageServiceTest {
 
     private final ImageFakes.Storage storage = new ImageFakes.Storage();
     private final ImageFakes.References references = new ImageFakes.References();
-    private final DeleteImageService service = new DeleteImageService(storage, references);
+    private final RecordingAuditLog audit = new RecordingAuditLog();
+    private final DeleteImageService service = new DeleteImageService(storage, references, audit);
 
     @Test // T56
     void anImageReferencedByAnActiveOrHistoricVersionIsInUseAndTheStorageIsNotTouched() {
@@ -56,5 +60,34 @@ class DeleteImageServiceTest {
         storage.add(KEY, Instant.EPOCH);
         storage.failure = new IllegalStateException("boom");
         assertThrows(ImageStorageUnavailableException.class, () -> service.delete(ID));
+    }
+
+    @Test
+    void aDeletionRecordsTheIdAndNothingElse() { // T41
+        storage.add(KEY, Instant.EPOCH);
+        service.delete(ID);
+        assertEquals(RecordingAuditLog.success(AuditAction.IMAGE_DELETED, Map.of("id", ID)), audit.only());
+    }
+
+    @Test
+    void inUseMissingMalformedAndFailingDeletionsRecordNothing() { // T41 (negativos)
+        storage.add(KEY, Instant.EPOCH);
+        references.keys.add(KEY);
+        assertThrows(ImageInUseException.class, () -> service.delete(ID));
+        references.keys.clear();
+        assertThrows(ImageNotFoundException.class, () -> service.delete("9f1c2d7e-2222-4a2b-8c3d-bbbbbbbbbbbb"));
+        assertThrows(ImageNotFoundException.class, () -> service.delete("../x"));
+        storage.failure = new IllegalStateException("boom");
+        assertThrows(ImageStorageUnavailableException.class, () -> service.delete(ID));
+        assertTrue(audit.events.isEmpty());
+    }
+
+    @Test
+    void ifTheStorageFailsWhileDeletingAfterTheChecksNothingIsRecorded() { // R2: el éxito se emite DESPUÉS del borrado
+        storage.add(KEY, Instant.EPOCH);
+        storage.failOnDelete = new IllegalStateException("boom");
+        assertThrows(ImageStorageUnavailableException.class, () -> service.delete(ID));
+        assertTrue(storage.objects.containsKey(KEY), "la comprobación pasó y el borrado falló");
+        assertTrue(audit.events.isEmpty());
     }
 }

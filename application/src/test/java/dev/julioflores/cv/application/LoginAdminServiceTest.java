@@ -3,6 +3,7 @@ package dev.julioflores.cv.application;
 import static dev.julioflores.cv.application.AdminFakes.CLOCK;
 import static dev.julioflores.cv.application.AdminFakes.NOW;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -10,13 +11,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.julioflores.cv.application.AdminFakes.FakeAccounts;
 import dev.julioflores.cv.application.AdminFakes.FakeHasher;
 import dev.julioflores.cv.application.AdminFakes.FakeIssuer;
+import dev.julioflores.cv.application.AdminFakes.RecordingAuditLog;
 import dev.julioflores.cv.application.admin.AdminSession;
+import dev.julioflores.cv.application.audit.AuditAction;
 import dev.julioflores.cv.application.error.ErrorCode;
 import dev.julioflores.cv.application.service.AdminInvalidCredentialsException;
 import dev.julioflores.cv.application.service.AdminLoginLockedException;
 import dev.julioflores.cv.application.service.AdminLoginRateLimitedException;
 import dev.julioflores.cv.application.service.LoginAdminService;
 import java.time.Duration;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class LoginAdminServiceTest {
@@ -24,6 +28,7 @@ class LoginAdminServiceTest {
     private static final String PASSWORD = "una frase larga y secreta";
 
     private final FakeHasher hasher = new FakeHasher();
+    private final RecordingAuditLog audit = new RecordingAuditLog();
     private boolean allowed = true;
     private int limiterCalls;
 
@@ -31,7 +36,7 @@ class LoginAdminServiceTest {
         return new LoginAdminService(accounts, hasher, new FakeIssuer(), key -> {
             limiterCalls++;
             return allowed;
-        }, CLOCK, 5, Duration.ofMinutes(15));
+        }, audit, CLOCK, 5, Duration.ofMinutes(15));
     }
 
     @Test
@@ -116,5 +121,78 @@ class LoginAdminServiceTest {
         FakeAccounts accounts = new FakeAccounts(FakeAccounts.account(hasher.hash(PASSWORD), 1, 0, null));
         service(accounts).login(PASSWORD);
         assertNull(accounts.replacedWith);
+    }
+
+    @Test
+    void aCorrectLoginRecordsOneSuccessWithoutAnyPassword() { // T31
+        FakeAccounts accounts = new FakeAccounts(FakeAccounts.account(hasher.hash(PASSWORD), 7, 3, null));
+        service(accounts).login(PASSWORD);
+        assertEquals(RecordingAuditLog.success(AuditAction.LOGIN_SUCCESS, Map.of()), audit.only());
+        assertFalse(audit.everything().contains(PASSWORD));
+        assertFalse(audit.everything().contains("fake:"), "ni el hash");
+        assertFalse(audit.everything().contains("token-sv"), "ni el token");
+    }
+
+    @Test
+    void aWrongPasswordAndAMissingAccountRecordALoginFailedWithTheirReason() { // T32
+        FakeAccounts accounts = new FakeAccounts(FakeAccounts.account(hasher.hash(PASSWORD), 1, 0, null));
+        assertThrows(AdminInvalidCredentialsException.class, () -> service(accounts).login("incorrecta"));
+        assertEquals(RecordingAuditLog.failure(AuditAction.LOGIN_FAILED, Map.of("reason", "bad_credentials")), audit.only());
+        assertFalse(audit.everything().contains("incorrecta"));
+
+        RecordingAuditLog again = new RecordingAuditLog();
+        var noAccount = new LoginAdminService(new FakeAccounts(null), hasher, new FakeIssuer(), key -> true, again, CLOCK, 5,
+                Duration.ofMinutes(15));
+        assertThrows(AdminInvalidCredentialsException.class, () -> noAccount.login(PASSWORD));
+        assertEquals(RecordingAuditLog.failure(AuditAction.LOGIN_FAILED, Map.of("reason", "no_account")), again.only());
+        assertFalse(again.everything().contains(PASSWORD));
+    }
+
+    @Test
+    void aLockedAccountRecordsLoginLockedWithTheWaitAndNeverASuccessEvenWithTheCorrectPassword() { // T33
+        FakeAccounts accounts = new FakeAccounts(
+                FakeAccounts.account(hasher.hash(PASSWORD), 1, 5, NOW.plusSeconds(600)));
+        assertThrows(AdminLoginLockedException.class, () -> service(accounts).login(PASSWORD));
+        assertEquals(RecordingAuditLog.failure(AuditAction.LOGIN_LOCKED, Map.of("retry_after_s", "600")), audit.only());
+        assertTrue(audit.events.stream().noneMatch(e -> e.action() == AuditAction.LOGIN_SUCCESS));
+    }
+
+    @Test
+    void anExhaustedGlobalLimitRecordsLoginRateLimited() { // T34
+        allowed = false;
+        assertThrows(AdminLoginRateLimitedException.class,
+                () -> service(new FakeAccounts(FakeAccounts.account(hasher.hash(PASSWORD), 1, 0, null))).login(PASSWORD));
+        assertEquals(RecordingAuditLog.failure(AuditAction.LOGIN_RATE_LIMITED, Map.of()), audit.only());
+    }
+
+    @Test
+    void aHashThatNeedsARehashStillRecordsASingleSuccess() { // T35
+        hasher.currentCost = 1;
+        String oldHash = hasher.hash(PASSWORD);
+        hasher.currentCost = 2;
+        FakeAccounts accounts = new FakeAccounts(FakeAccounts.account(oldHash, 1, 0, null));
+        service(accounts).login(PASSWORD);
+        assertEquals("fake:2:" + PASSWORD, accounts.replacedWith);
+        assertEquals(RecordingAuditLog.success(AuditAction.LOGIN_SUCCESS, Map.of()), audit.only());
+        assertFalse(audit.everything().contains("fake:"));
+    }
+
+    @Test
+    void ifRecordingTheSuccessOrIssuingTheTokenFailsNoLoginSuccessIsRecorded() { // R2: el éxito se emite DESPUÉS
+        FakeAccounts failing = new FakeAccounts(FakeAccounts.account(hasher.hash(PASSWORD), 1, 0, null)) {
+            @Override
+            public void recordSuccess() {
+                throw new IllegalStateException("db down");
+            }
+        };
+        assertThrows(IllegalStateException.class, () -> service(failing).login(PASSWORD));
+
+        FakeAccounts fine = new FakeAccounts(FakeAccounts.account(hasher.hash(PASSWORD), 1, 0, null));
+        var noToken = new LoginAdminService(fine, hasher, sv -> {
+            throw new IllegalStateException("signing failed");
+        }, key -> true, audit, CLOCK, 5, Duration.ofMinutes(15));
+        assertThrows(IllegalStateException.class, () -> noToken.login(PASSWORD));
+
+        assertTrue(audit.events.isEmpty());
     }
 }

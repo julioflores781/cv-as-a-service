@@ -25,6 +25,8 @@ final class ImageFakes {
         final List<String> deleted = new ArrayList<>();
         final List<Integer> batchSizes = new ArrayList<>();
         RuntimeException failure;
+        /** Solo fallan las escrituras de borrado (el listado y la subida funcionan). */
+        RuntimeException failOnDelete;
         int calls;
 
         void add(String key, Instant lastModified) {
@@ -44,6 +46,9 @@ final class ImageFakes {
         @Override
         public void delete(String key) {
             calls++;
+            if (failOnDelete != null) {
+                throw failOnDelete;
+            }
             if (failure != null) {
                 throw failure;
             }
@@ -54,6 +59,9 @@ final class ImageFakes {
         @Override
         public void deleteAll(List<String> keys) {
             calls++;
+            if (failOnDelete != null) {
+                throw failOnDelete;
+            }
             if (failure != null) {
                 throw failure;
             }

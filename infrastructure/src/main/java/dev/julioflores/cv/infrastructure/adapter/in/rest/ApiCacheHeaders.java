@@ -1,5 +1,6 @@
 package dev.julioflores.cv.infrastructure.adapter.in.rest;
 
+import dev.julioflores.cv.infrastructure.config.AdminRoutes;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerResponseContext;
 import jakarta.ws.rs.core.HttpHeaders;
@@ -15,7 +16,7 @@ public class ApiCacheHeaders {
 
     @ServerResponseFilter
     public void addHeaders(ContainerRequestContext request, ContainerResponseContext response) {
-        if (AdminPaths.isAdmin(AdminPaths.normalized(request))) {
+        if (AdminRoutes.isAdmin(AdminPaths.normalized(request))) {
             // Sesiones y contenido de administración: nada de caché, ni compartida ni del navegador, sea cual sea el estado.
             response.getHeaders().putSingle(HttpHeaders.CACHE_CONTROL, ADMIN_CACHE_CONTROL_VALUE);
             return;

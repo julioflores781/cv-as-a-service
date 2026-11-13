@@ -1,6 +1,7 @@
 package dev.julioflores.cv.infrastructure.adapter.in.rest;
 
 import dev.julioflores.cv.infrastructure.config.AdminConfig;
+import dev.julioflores.cv.infrastructure.config.AdminRoutes;
 import jakarta.ws.rs.NotFoundException;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import org.jboss.resteasy.reactive.server.ServerRequestFilter;
@@ -27,7 +28,7 @@ public class AdminEdgeGuard {
 
     @ServerRequestFilter(preMatching = true)
     public void guard(ContainerRequestContext request) {
-        if (!AdminPaths.isAdmin(AdminPaths.normalized(request))) {
+        if (!AdminRoutes.isAdmin(AdminPaths.normalized(request))) {
             return;
         }
         boolean viaCloudflare =

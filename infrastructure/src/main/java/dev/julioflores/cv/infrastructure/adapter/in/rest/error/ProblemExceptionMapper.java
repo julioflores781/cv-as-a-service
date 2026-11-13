@@ -10,6 +10,8 @@ import io.quarkus.security.ForbiddenException;
 import io.quarkus.security.UnauthorizedException;
 import dev.julioflores.cv.domain.Language;
 import dev.julioflores.cv.infrastructure.adapter.in.rest.LanguageParams;
+import dev.julioflores.cv.infrastructure.config.ErrorLogDescription;
+import dev.julioflores.cv.infrastructure.config.RequestContextHandler;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.Response;
@@ -17,6 +19,7 @@ import jakarta.ws.rs.core.UriInfo;
 import java.io.IOException;
 import java.util.List;
 import org.jboss.logging.Logger;
+import org.jboss.logging.MDC;
 import org.jboss.resteasy.reactive.server.ServerExceptionMapper;
 
 /**
@@ -79,10 +82,11 @@ public class ProblemExceptionMapper {
         return unexpected(e, uri, headers);
     }
 
-    /** Cualquier fallo inesperado: se registra con su traza y el cliente solo recibe un mensaje genérico. */
+    /** Cualquier fallo inesperado: se registra (con su traza, salvo errores de BD; ver {@link ErrorLogDescription}) y el cliente solo recibe un mensaje genérico. */
     @ServerExceptionMapper
     public Response unexpected(Exception e, UriInfo uri, HttpHeaders headers) {
-        LOG.error("Unexpected error", e);
+        ErrorLogDescription.Described described = ErrorLogDescription.describe(e);
+        LOG.error(described.message(), described.thrown());
         return problem(ApiError.UNEXPECTED, language(uri, headers), List.of());
     }
 
@@ -98,6 +102,7 @@ public class ProblemExceptionMapper {
     /** Un 401 siempre lleva el desafío {@code WWW-Authenticate: Bearer}. */
     private static Response.ResponseBuilder builder(
             ApiError error, Language language, List<?> args, List<ProblemResponse.ProblemError> errors) {
+        MDC.put(RequestContextHandler.MDC_ERROR_CODE, error.name());
         Response.ResponseBuilder response = Response.status(error.status())
                 .type(ProblemResponse.MEDIA_TYPE)
                 .entity(new ProblemResponse(

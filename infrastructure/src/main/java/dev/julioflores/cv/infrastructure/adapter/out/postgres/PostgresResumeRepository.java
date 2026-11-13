@@ -2,6 +2,7 @@ package dev.julioflores.cv.infrastructure.adapter.out.postgres;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.julioflores.cv.application.port.out.ResumeRepository;
+import dev.julioflores.cv.infrastructure.config.ErrorLogDescription;
 import dev.julioflores.cv.domain.Language;
 import dev.julioflores.cv.domain.Resume;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -80,7 +81,9 @@ public class PostgresResumeRepository implements ResumeRepository {
             if (stale == null) {
                 throw e;
             }
-            LOG.warnf(e, "Cannot refresh the '%s' resume; serving the last one read", language.tag());
+            // Sin mensaje ni traza de errores SQL/JDBC (pueden llevar host, URL o filas): ver ErrorLogDescription.
+            ErrorLogDescription.Described described = ErrorLogDescription.describe(e);
+            LOG.warnf(described.thrown(), "Cannot refresh the '%s' resume (%s); serving the last one read", language.tag(), described.message());
             return new Cached(stale.resume(), System.nanoTime() + ttlNanos);
         }
     }

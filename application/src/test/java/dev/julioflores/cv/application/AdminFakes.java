@@ -1,7 +1,11 @@
 package dev.julioflores.cv.application;
 
 import dev.julioflores.cv.application.admin.AdminSession;
+import dev.julioflores.cv.application.audit.AuditAction;
+import dev.julioflores.cv.application.audit.AuditEvent;
+import dev.julioflores.cv.application.audit.AuditOutcome;
 import dev.julioflores.cv.application.port.out.AdminAccountRepository;
+import dev.julioflores.cv.application.port.out.AuditLog;
 import dev.julioflores.cv.application.port.out.PasswordHasher;
 import dev.julioflores.cv.application.port.out.SessionTokenIssuer;
 import dev.julioflores.cv.domain.AdminAccount;
@@ -11,6 +15,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /** Fakes en memoria de los puertos de administración. */
@@ -20,6 +25,37 @@ final class AdminFakes {
     static final Clock CLOCK = Clock.fixed(NOW, ZoneOffset.UTC);
 
     private AdminFakes() {}
+
+    /** Anota los eventos de auditoría en orden; los tests los comparan por valor (record). */
+    static final class RecordingAuditLog implements AuditLog {
+        final List<AuditEvent> events = new ArrayList<>();
+
+        @Override
+        public void record(AuditEvent event) {
+            events.add(event);
+        }
+
+        /** El único evento emitido: falla si hay cero o varios (cada operación deja exactamente uno). */
+        AuditEvent only() {
+            if (events.size() != 1) {
+                throw new AssertionError("expected exactly one audit event but got " + events);
+            }
+            return events.get(0);
+        }
+
+        static AuditEvent success(AuditAction action, Map<String, String> details) {
+            return new AuditEvent(action, AuditOutcome.SUCCESS, details);
+        }
+
+        static AuditEvent failure(AuditAction action, Map<String, String> details) {
+            return new AuditEvent(action, AuditOutcome.FAILURE, details);
+        }
+
+        /** Todo lo que se vería en un log: acción, resultado y detalles. */
+        String everything() {
+            return events.toString();
+        }
+    }
 
     /** Hash de mentira: «fake:{coste}:{contraseña}». */
     static final class FakeHasher implements PasswordHasher {

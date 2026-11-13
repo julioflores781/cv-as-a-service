@@ -5,6 +5,7 @@ import dev.julioflores.cv.infrastructure.adapter.out.postgres.PostgresAdminAccou
 import jakarta.annotation.Priority;
 import jakarta.enterprise.inject.Alternative;
 import jakarta.inject.Singleton;
+import java.sql.SQLException;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.List;
@@ -30,7 +31,9 @@ public class ThreadRecordingAccountRepository extends PostgresAdminAccountReposi
     public Optional<AdminAccount> find() {
         READ_THREADS.add(Thread.currentThread().getName());
         if (failReads) {
-            throw new IllegalStateException("jdbc:postgresql://secreto:5432/db password=hunter2 is down");
+            // Igual que el repositorio real: un SQLException envuelto en IllegalStateException (con datos que no deben llegar a ningún log).
+            throw new IllegalStateException("Could not read the admin account",
+                    new SQLException("jdbc:postgresql://secreto:5432/db password=hunter2 is down", "08006"));
         }
         return super.find();
     }

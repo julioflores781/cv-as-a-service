@@ -4,6 +4,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import dev.julioflores.cv.application.AdminFakes.RecordingAuditLog;
+import dev.julioflores.cv.application.audit.AuditAction;
 import dev.julioflores.cv.application.contact.ContactMessageEntry;
 import dev.julioflores.cv.application.contact.ContactMessagePage;
 import dev.julioflores.cv.application.port.out.ContactMessageRepository;
@@ -13,6 +15,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 class ListContactMessagesServiceTest {
@@ -47,7 +50,8 @@ class ListContactMessagesServiceTest {
     }
 
     private final FakeRepository repository = new FakeRepository();
-    private final ListContactMessagesService service = new ListContactMessagesService(repository);
+    private final RecordingAuditLog audit = new RecordingAuditLog();
+    private final ListContactMessagesService service = new ListContactMessagesService(repository, audit);
 
     private void store(int count) {
         for (int id = 1; id <= count; id++) {
@@ -123,5 +127,25 @@ class ListContactMessagesServiceTest {
         ContactMessagePage first = service.list(3, null);
         assertEquals(List.of(4L, 3L, 2L), ids(first));
         assertEquals(List.of(1L), ids(service.list(3, first.next())));
+    }
+
+    @Test
+    void everyReadRecordsLimitReturnedAndPagedWithoutNamesEmailsOrBodies() { // T43
+        store(5);
+        service.list(2, null);
+        assertEquals(RecordingAuditLog.success(AuditAction.MESSAGES_READ, Map.of("limit", "2", "returned", "2", "paged", "true")),
+                audit.only());
+        audit.events.clear();
+
+        service.list(100_000, null);
+        assertEquals(Map.of("limit", "100", "returned", "5", "paged", "false"), audit.only().details());
+        String logged = audit.everything();
+        assertTrue(!logged.contains("Ada") && !logged.contains("@example.com") && !logged.contains("Mensaje número"));
+    }
+
+    @Test
+    void anEmptyPageIsStillRecordedAsARead() { // extra fuera del plan
+        service.list(10, null);
+        assertEquals(Map.of("limit", "10", "returned", "0", "paged", "false"), audit.only().details());
     }
 }
