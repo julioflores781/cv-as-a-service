@@ -7,7 +7,7 @@ Backend Quarkus con arquitectura hexagonal en tres módulos Maven. Ver [ARCHITEC
 ```
 cv/
 ├── deploy/          copia de seguridad de la base de datos (el compose del NAS vive en el repo cv-web)
-├── docs/            checklist de puesta en marcha del admin (admin-runbook.md)
+├── docs/            puesta en marcha del admin (admin-runbook.md) y guía de logs (observability.md)
 ├── db/sample/       CV ficticio (JSON + seed SQL) para pruebas y arranque sin datos privados
 ├── private/         (ignorado por git) CV real y su seed: content/ · seed.sql
 ├── domain/          modelo de dominio puro (sin frameworks)
@@ -16,6 +16,9 @@ cv/
 ```
 
 Además: `scripts/` (resumen del pipeline, smoke test, generador del seed y `admin-password.sh`), `Dockerfile` y `.github/workflows/ci.yml`.
+
+## Logs
+JSON en producción (access log, auditoría del admin, eventos de contacto y errores sin datos), con `X-Request-Id` en toda respuesta para cruzar `cv-web` y `cv-api`. Formato, qué no se registra jamás, cómo leerlos en el NAS y la rotación (10 MB x 5 por contenedor): [docs/observability.md](docs/observability.md).
 
 ## Comandos
 

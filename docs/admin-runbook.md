@@ -110,6 +110,8 @@ El smoke test (`scripts/smoke-test.sh`) hace las comprobaciones de 401 y de `CF-
 
 ## 7. Rotación y recuperación
 
+Logs y auditoría (quién hizo qué, intentos de login, búsqueda por `request_id`): [observability.md](observability.md).
+
 - **Contraseña olvidada o sospecha de filtración:** `./admin-password.sh set-password` (no pide la anterior). Sube `session_version`, así que
   **todos** los tokens emitidos dejan de valer, y quita cualquier bloqueo.
 - **Cuenta bloqueada** (5 fallos seguidos = 15 min; cualquiera que llegue al login puede provocarlo): espera o `./admin-password.sh unlock`.

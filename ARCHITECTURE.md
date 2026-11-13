@@ -34,6 +34,7 @@ Convenciones:
   - Un único `ProblemExceptionMapper` (paquete `adapter.in.rest.error`) los traduce; `ApiError` es la tabla única código → estado HTTP. Los fallos inesperados (`500`) se registran con su traza y el cliente solo recibe un mensaje genérico.
   - **Añadir un error nuevo:** una constante en `ErrorCode` (si es de negocio) y en `ApiError`, y sus textos `CODIGO.title` / `CODIGO.detail` en los dos `.properties`. `ProblemCatalogTest` falla si falta algo. Los apóstrofos en los `.properties` se duplican (`''`) por `MessageFormat`.
 - **Documentación OpenAPI** completa: cada operación con descripción, parámetros, y todas sus salidas (200, 404 y 500) con ejemplos reales; esquemas con descripción por campo. `OpenApiDocumentTest` falla si un endpoint queda sin documentar.
+- **Trazabilidad** (guía de uso en [docs/observability.md](docs/observability.md)): toda respuesta lleva `X-Request-Id` (el del cliente si cumple `^[A-Za-z0-9._-]{8,64}$`; si no, uno generado) y cada petición deja una línea de access log (`GET /ruta 200 12ms 534b rid=… err=… ip=…`, sin query ni cabeceras; la IP solo en `/api/v1/admin`, de `CF-Connecting-IP` o `X-Client-IP` si son IP válidas).
 - **Caché:** `Cache-Control: public, max-age=300` y `Vary: Accept-Language` en los GET con 200 (implementado). `ETag` pendiente.
 - **CORS** limitado al dominio propio.
 - **Datos públicos**, solo lectura. La escritura vive aparte, bajo `/api/v1/admin` (sección 7), con sesión; el **CV** (`resume`) sigue sin editarse por la API: se publica con `make-seed.py`.
@@ -141,6 +142,14 @@ Al guardar no se comprueba que la imagen exista en el bucket.
 muestra el `Retry-After`; un 409 `CONTENT_VERSION_CONFLICT` recarga. Siempre se reenvía la `baseVersion`/`baseVersions`. Mensajes según el `code`, no el texto. Comprobar `Origin` en los handlers que mutan (CSRF).
 **No reenviar cabeceras `CF-*`** a la API (rompería `AdminEdgeGuard`). La subida reenvía el `multipart` tal cual (los route handlers no tienen el tope de 1 MB de las server actions; comprobarlo en el despliegue standalone).
 La web pública lee `project.images[].url` del endpoint público.
+
+**Auditoría.** Puerto de salida `AuditLog` (`record(AuditEvent)`, **nunca lanza**) con `AuditAction`/`AuditOutcome`/`AuditEvent` en `application.audit`; el único adaptador es `LogAuditLog` (`adapter.out.audit`), que escribe en el logger `audit`
+`action=… outcome=… clave=valor…` (detalles ordenados; INFO si éxito, WARN si fallo de seguridad). El `request_id` y el `client_ip` salen del MDC. Los nueve servicios emiten el evento tras el éxito (o justo antes de lanzar, en los fallos de seguridad):
+`LOGIN_SUCCESS`, `LOGIN_FAILED` (`reason=bad_credentials|no_account`), `LOGIN_LOCKED` (`retry_after_s`), `LOGIN_RATE_LIMITED`, `PASSWORD_CHANGED`, `PASSWORD_CHANGE_FAILED` (`reason=wrong_current|locked|weak`), `SESSIONS_REVOKED`,
+`CONTENT_SAVED` (`kind`, `es_version`, `en_version`, `comment_present`, `comment_length`), `CONTENT_ROLLED_BACK` (`kind`, `lang`, `from_version`, `to_version`), `IMAGE_UPLOADED` (`key`, `content_type`, `bytes`, `width`, `height`),
+`IMAGE_DELETED` (`id`), `IMAGES_CLEANUP` (`dry_run`, `older_than_hours`, `deleted`, `would_delete`, `kept`) y `MESSAGES_READ` (`limit`, `returned`, `paged`). Un fallo de validación, conflicto o not-found del contenido no se audita (ya está en el access log con `err=`),
+ni las lecturas de contenido, versiones, sesión o imágenes. Nunca van contraseñas, tokens, hashes, comentarios, cuerpos ni datos de mensajes: `AuditEvent` solo admite pares de texto y su constructor sanea claves y valores (sin saltos de línea ni espacios, 120 caracteres como máximo)
+para que nadie falsee una línea. No hay tabla de auditoría: la retención es la rotación de logs de Docker (`json-file`, 10 MB x 5 por contenedor, ver [docs/observability.md](docs/observability.md)).
 
 **Trampas.**
 - **Protección de red.** La API es pública. La regla de Cloudflare que bloquea `/api/v1/admin/*` es tarea del dueño (runbook). `AdminEdgeGuard` es defensa en profundidad: con `CV_ADMIN_EDGE_BLOCK=true` responde 404 a lo que lleve

@@ -38,6 +38,30 @@ expect "/api/v1/resume"                          '"experience"'
 expect "/api/v1/experience/nope"                 "EXPERIENCE_NOT_FOUND" 404
 expect "/api/v1/experience/nope?lang=en"         "Experience not found" 404
 
+# Trazabilidad: toda respuesta lleva X-Request-Id. Sin cabecera de entrada la API genera uno de 32 hex; con uno válido
+# (^[A-Za-z0-9._-]{8,64}$) devuelve el mismo; con uno inválido lo sustituye y nunca lo refleja.
+# request_id_of URL [cabecera...]: imprime el valor de X-Request-Id de la respuesta (vacío si falta).
+request_id_of() {
+  local url=$1; shift
+  curl -fsS -D - -o /dev/null "$@" "$BASE$url" | tr -d '\r' | awk -F': *' 'tolower($1) == "x-request-id" { print $2; exit }'
+}
+
+generated=$(request_id_of "/api/v1/profile") || fail "/api/v1/profile no responde"
+[[ "$generated" =~ ^[0-9a-f]{32}$ ]] || fail "X-Request-Id generado inválido o ausente en /api/v1/profile: '$generated'"
+echo "✅ X-Request-Id generado ($generated)"
+
+echoed=$(request_id_of "/api/v1/profile" -H "X-Request-Id: smoke-test-0001") || fail "/api/v1/profile no responde"
+[ "$echoed" = "smoke-test-0001" ] || fail "X-Request-Id válido no devuelto tal cual: '$echoed'"
+echo "✅ X-Request-Id válido devuelto igual"
+
+replaced=$(request_id_of "/api/v1/profile" -H "X-Request-Id: corto") || fail "/api/v1/profile no responde"
+{ [[ "$replaced" =~ ^[0-9a-f]{32}$ ]] && [ "$replaced" != "corto" ]; } || fail "X-Request-Id inválido no sustituido: '$replaced'"
+echo "✅ X-Request-Id inválido sustituido"
+
+ready=$(request_id_of "/q/health/ready") || fail "/q/health/ready no responde"
+[[ "$ready" =~ ^[0-9a-f]{32}$ ]] || fail "la respuesta de health no lleva X-Request-Id: '$ready'"
+echo "✅ health responde 200 y lleva X-Request-Id"
+
 # post URL CUERPO FRAGMENTO [ESTADO_HTTP]: igual que expect, pero con un POST text/plain.
 post() {
   local url=$1 payload=$2 fragment=$3 status=${4:-200} ctype=${5:-text/plain} out body code
