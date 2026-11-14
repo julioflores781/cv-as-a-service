@@ -30,6 +30,22 @@ class OpenApiDocumentTest {
             "/api/v1/profile", "/api/v1/impact", "/api/v1/experience", "/api/v1/experience/{id}",
             "/api/v1/skills", "/api/v1/education", "/api/v1/contact", "/api/v1/resume");
 
+    private static final String ADMIN_PREFIX = "/api/v1/admin/auth";
+    private static final Set<String> ADMIN_ENDPOINTS = Set.of(
+            ADMIN_PREFIX + "/login", ADMIN_PREFIX + "/session", ADMIN_PREFIX + "/password", ADMIN_PREFIX + "/logout-all");
+
+    private static final String CONTENT = "/api/v1/admin/content/{kind}";
+    private static final String CONTENT_VERSIONS = CONTENT + "/{lang}/versions";
+    private static final String CONTENT_VERSION = CONTENT_VERSIONS + "/{version}";
+    private static final String CONTENT_ROLLBACK = CONTENT + "/{lang}/rollback";
+    private static final Set<String> ADMIN_CONTENT_ENDPOINTS =
+            Set.of(CONTENT, CONTENT_VERSIONS, CONTENT_VERSION, CONTENT_ROLLBACK);
+
+    private static final String IMAGES = "/api/v1/admin/images";
+    private static final Set<String> ADMIN_IMAGES_ENDPOINTS = Set.of(IMAGES, IMAGES + "/{id}", IMAGES + "/cleanup");
+
+    private static final String ADMIN_MESSAGES = "/api/v1/admin/contact-messages";
+
     private static JsonPath cached;
 
     /**
@@ -56,6 +72,10 @@ class OpenApiDocumentTest {
         expected.add(HL7_PATH);
         expected.add(CONTACT_MESSAGES_PATH);
         expected.addAll(CONTENT_ENDPOINTS);
+        expected.addAll(ADMIN_ENDPOINTS);
+        expected.addAll(ADMIN_CONTENT_ENDPOINTS);
+        expected.addAll(ADMIN_IMAGES_ENDPOINTS);
+        expected.add(ADMIN_MESSAGES);
         assertEquals(expected, documented);
     }
 
@@ -308,5 +328,245 @@ class OpenApiDocumentTest {
     @Test
     void testOnlyEndpointStaysOutOfTheDocument() {
         assertFalse(doc().<Map<String, Object>>getJsonObject("paths").containsKey("/test/boom"));
+    }
+
+    // ── Administración: auth (T118, parte auth) ─────────────────────────────────
+
+    private Map<String, Object> adminOperation(String path) {
+        Map<String, Object> item = doc().getMap("paths.'" + path + "'");
+        assertEquals(1, item.size(), path + " debe tener un solo método");
+        return doc().getMap("paths.'" + path + "'." + item.keySet().iterator().next());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void adminAuthOperationsAreDocumentedWithTagSecurityAndOutputs() { // T118
+        Map<String, Set<String>> expectedResponses = Map.of(
+                ADMIN_PREFIX + "/login", Set.of("200", "400", "401", "429", "500"),
+                ADMIN_PREFIX + "/session", Set.of("200", "401", "500"),
+                ADMIN_PREFIX + "/password", Set.of("200", "400", "401", "403", "422", "429", "500"),
+                ADMIN_PREFIX + "/logout-all", Set.of("204", "401", "500"));
+        for (String path : ADMIN_ENDPOINTS) {
+            Map<String, Object> op = adminOperation(path);
+            assertNotNull(op.get("operationId"), path + " sin operationId");
+            assertNotNull(op.get("summary"), path + " sin summary");
+            assertTrue(((String) op.get("description")).length() > 30, path + " con descripción pobre");
+            assertEquals(List.of("Admin"), op.get("tags"), path);
+            boolean isLogin = path.endsWith("/login");
+            assertEquals(!isLogin, op.get("security") != null, path + ": bearerAuth solo fuera del login");
+            Map<String, Object> responses = (Map<String, Object>) op.get("responses");
+            assertEquals(expectedResponses.get(path), responses.keySet(), path);
+            responses.forEach((code, response) -> {
+                assertNotNull(((Map<String, Object>) response).get("description"), path + " " + code + " sin descripción");
+                if (!"204".equals(code)) {
+                    assertFalse(((Map<String, Object>) ((Map<String, Object>) response).get("content")).isEmpty(),
+                            path + " " + code + " sin contenido");
+                }
+            });
+        }
+        assertEquals("http", doc().getString("components.securitySchemes.bearerAuth.type"));
+        assertEquals("bearer", doc().getString("components.securitySchemes.bearerAuth.scheme"));
+        assertEquals("JWT", doc().getString("components.securitySchemes.bearerAuth.bearerFormat"));
+        List<Map<String, Object>> tags = doc().getList("tags");
+        assertTrue(tags.stream().anyMatch(t -> "Admin".equals(t.get("name")) && t.get("description") != null));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void adminAuthErrorsUseProblemJsonWithExamplesAndRequestBodiesAreDocumented() { // T118
+        for (String path : ADMIN_ENDPOINTS) {
+            Map<String, Object> op = adminOperation(path);
+            Map<String, Map<String, Object>> responses = (Map<String, Map<String, Object>>) op.get("responses");
+            responses.forEach((code, response) -> {
+                if (code.compareTo("400") < 0) {
+                    return;
+                }
+                Map<String, Object> media = (Map<String, Object>) ((Map<String, Object>) response.get("content"))
+                        .get("application/problem+json");
+                assertNotNull(media, path + " " + code + " no es problem+json");
+                assertEquals("#/components/schemas/Problem", ((Map<String, Object>) media.get("schema")).get("$ref"),
+                        path + " " + code);
+                assertTrue(media.get("example") != null || media.get("examples") != null, path + " " + code + " sin ejemplo");
+            });
+        }
+        for (String path : List.of(ADMIN_PREFIX + "/login", ADMIN_PREFIX + "/password")) {
+            assertNotNull(adminOperation(path).get("requestBody"), path + " sin requestBody");
+        }
+        assertNotNull(doc().get("paths.'" + ADMIN_PREFIX + "/login'.post.responses.'429'.headers.'Retry-After'.description"));
+        assertNotNull(doc().get("paths.'" + ADMIN_PREFIX + "/session'.get.responses.'200'.headers.'Cache-Control'.description"));
+        assertNotNull(doc().get("paths.'" + ADMIN_PREFIX + "/session'.get.responses.'401'.headers.'WWW-Authenticate'.description"));
+        assertNotNull(doc().get("components.schemas.AdminLoginRequest.properties.password.description"));
+        assertNotNull(doc().get("components.schemas.AdminPasswordChangeRequest.properties.newPassword.description"));
+        assertNotNull(doc().get("components.schemas.AdminToken.properties.accessToken.description"));
+    }
+
+    @Test
+    void problemSchemaListsTheAdminCodes() { // T118
+        String description = doc().getString("components.schemas.Problem.properties.code.description");
+        assertTrue(description.contains("`ADMIN_UNAUTHORIZED` (401)"));
+        assertTrue(description.contains("`ADMIN_LOGIN_LOCKED` (429)"));
+        assertTrue(description.contains("`ADMIN_WEAK_PASSWORD` (422)"));
+    }
+
+    // ── Administración: contenido (T120 y la documentación de las rutas nuevas) ──────
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void problemSchemaDocumentsTheErrorsListAndTheContentCodes() { // T120
+        assertNotNull(doc().get("components.schemas.Problem.properties.errors.description"));
+        assertEquals("array", doc().getString("components.schemas.Problem.properties.errors.type"));
+        assertFalse(doc().getList("components.schemas.Problem.required").contains("errors"), "errors es opcional");
+        assertNotNull(doc().get("components.schemas.ProblemError.properties.path.description"));
+        assertNotNull(doc().get("components.schemas.ProblemError.properties.code.description"));
+        List<String> codes = doc().getList("components.schemas.Problem.properties.code.enum");
+        for (String code : List.of("CONTENT_VERSION_CONFLICT", "CONTENT_VERSION_NOT_FOUND", "CONTENT_INVALID",
+                "CONTENT_PARITY_BROKEN", "CONTENT_TOO_LARGE")) {
+            assertTrue(codes.contains(code), code);
+        }
+        String description = doc().getString("components.schemas.Problem.properties.code.description");
+        assertTrue(description.contains("`CONTENT_VERSION_CONFLICT` (409)"));
+        assertTrue(description.contains("`CONTENT_INVALID` (422)"));
+        assertTrue(description.contains("`CONTENT_TOO_LARGE` (413)"));
+    }
+
+    @SuppressWarnings("unchecked")
+    @Test
+    void adminContentOperationsAreDocumentedWithTagSecurityRequestsAndEveryOutput() {
+        Map<String, Set<String>> expected = Map.of(
+                "get " + CONTENT, Set.of("200", "401", "404", "500"),
+                "put " + CONTENT, Set.of("200", "400", "401", "404", "409", "413", "422", "500"),
+                "get " + CONTENT_VERSIONS, Set.of("200", "401", "404", "500"),
+                "get " + CONTENT_VERSION, Set.of("200", "401", "404", "500"),
+                "post " + CONTENT_ROLLBACK, Set.of("200", "400", "401", "404", "409", "422", "500"));
+        Set<String> operationIds = new HashSet<>();
+        expected.forEach((key, codes) -> {
+            String[] parts = key.split(" ");
+            String op = "paths.'" + parts[1] + "'." + parts[0];
+            assertNotNull(doc().get(op + ".operationId"), key);
+            assertTrue(operationIds.add(doc().getString(op + ".operationId")), "operationId repetido en " + key);
+            assertNotNull(doc().get(op + ".summary"), key);
+            assertTrue(doc().getString(op + ".description").length() > 30, key);
+            assertEquals(List.of("Admin"), doc().getList(op + ".tags"), key);
+            assertNotNull(doc().get(op + ".security"), key + " sin bearerAuth");
+            Map<String, Object> responses = doc().getMap(op + ".responses");
+            assertEquals(codes, responses.keySet(), key);
+            responses.forEach((code, response) -> {
+                assertNotNull(((Map<String, Object>) response).get("description"), key + " " + code);
+                Map<String, Object> content = (Map<String, Object>) ((Map<String, Object>) response).get("content");
+                assertFalse(content.isEmpty(), key + " " + code + " sin contenido");
+                content.forEach((media, definition) -> assertTrue(((Map<String, Object>) definition).get("example") != null
+                        || ((Map<String, Object>) definition).get("examples") != null, key + " " + code + " sin ejemplo"));
+                if (code.compareTo("400") >= 0) {
+                    assertNotNull(content.get("application/problem+json"), key + " " + code + " no es problem+json");
+                }
+            });
+            assertNotNull(doc().get(op + ".responses.'200'.headers.'Cache-Control'.description"), key);
+            if (parts[0].equals("put") || parts[0].equals("post")) {
+                assertNotNull(doc().get(op + ".requestBody.content.'application/json'.examples"), key + " sin ejemplo de petición");
+                assertEquals(Boolean.TRUE, doc().getBoolean(op + ".requestBody.required"), key);
+            }
+        });
+        assertNotNull(doc().get("paths.'" + CONTENT + "'.put.responses.'422'.content.'application/problem+json'.examples.invalid"));
+        assertNotNull(doc().get("paths.'" + CONTENT + "'.put.responses.'422'.content.'application/problem+json'.examples.parityBroken"));
+        assertNotNull(doc().get("paths.'" + CONTENT + "'.get.responses.'200'.content.'application/json'.examples.nothingPublished"));
+        List<Map<String, Object>> params = doc().getList("paths.'" + CONTENT_VERSIONS + "'.get.parameters");
+        for (String name : List.of("kind", "lang", "limit")) {
+            assertTrue(params.stream().anyMatch(p -> name.equals(p.get("name")) && p.get("description") != null), name);
+        }
+        for (String schema : List.of("AdminContent", "AdminContentSave", "AdminContentVersions", "AdminContentSnapshot",
+                "AdminContentRollback", "AdminContentParity", "AdminContentLanguage")) {
+            assertNotNull(doc().get("components.schemas." + schema + ".description"), schema + " sin descripción");
+            Map<String, Map<String, Object>> props = doc().getMap("components.schemas." + schema + ".properties");
+            props.forEach((prop, def) -> assertTrue(def.containsKey("description") || def.containsKey("$ref")
+                    || def.containsKey("example"), schema + "." + prop + " sin documentar"));
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void adminImageOperationsAreDocumentedWithTagSecurityMultipartAndEveryOutput() {
+        Map<String, Set<String>> expected = Map.of(
+                "post " + IMAGES, Set.of("201", "400", "401", "413", "415", "500", "503"),
+                "get " + IMAGES, Set.of("200", "401", "500", "503"),
+                "delete " + IMAGES + "/{id}", Set.of("204", "401", "404", "409", "500", "503"),
+                "post " + IMAGES + "/cleanup", Set.of("200", "401", "500", "503"));
+        Set<String> operationIds = new HashSet<>();
+        expected.forEach((key, codes) -> {
+            String[] parts = key.split(" ");
+            String op = "paths.'" + parts[1] + "'." + parts[0];
+            assertTrue(operationIds.add(doc().getString(op + ".operationId")), "operationId repetido en " + key);
+            assertNotNull(doc().get(op + ".summary"), key);
+            assertTrue(doc().getString(op + ".description").length() > 30, key);
+            assertEquals(List.of("Admin"), doc().getList(op + ".tags"), key);
+            assertNotNull(doc().get(op + ".security"), key + " sin bearerAuth");
+            Map<String, Object> responses = doc().getMap(op + ".responses");
+            assertEquals(codes, responses.keySet(), key);
+            responses.forEach((code, response) -> {
+                assertNotNull(((Map<String, Object>) response).get("description"), key + " " + code);
+                if (code.equals("204")) {
+                    return;
+                }
+                Map<String, Object> content = (Map<String, Object>) ((Map<String, Object>) response).get("content");
+                assertFalse(content.isEmpty(), key + " " + code + " sin contenido");
+                content.forEach((media, definition) -> assertTrue(((Map<String, Object>) definition).get("example") != null
+                        || ((Map<String, Object>) definition).get("examples") != null, key + " " + code + " sin ejemplo"));
+                if (code.compareTo("400") >= 0) {
+                    assertNotNull(content.get("application/problem+json"), key + " " + code + " no es problem+json");
+                }
+            });
+        });
+        String upload = "paths.'" + IMAGES + "'.post.requestBody";
+        assertEquals(Boolean.TRUE, doc().getBoolean(upload + ".required"));
+        assertNotNull(doc().get(upload + ".content.'multipart/form-data'.schema"));
+        assertNotNull(doc().get("components.schemas.AdminImageUploadForm.properties.file.description"));
+        for (String schema : List.of("AdminImageUploaded", "AdminImageEntry", "AdminImageList", "AdminImageCleanup",
+                "AdminImageUploadForm", "ProjectImage")) {
+            assertNotNull(doc().get("components.schemas." + schema + ".description"), schema + " sin descripción");
+            Map<String, Map<String, Object>> props = doc().getMap("components.schemas." + schema + ".properties");
+            props.forEach((prop, def) -> assertTrue(def.containsKey("description") || def.containsKey("$ref")
+                    || def.containsKey("example"), schema + "." + prop + " sin documentar"));
+        }
+        assertNotNull(doc().get("components.schemas.Project.properties.images.description"));
+        for (String name : List.of("dryRun", "olderThanHours")) {
+            List<Map<String, Object>> params = doc().getList("paths.'" + IMAGES + "/cleanup'.post.parameters");
+            assertTrue(params.stream().anyMatch(p -> name.equals(p.get("name")) && p.get("description") != null), name);
+        }
+    }
+
+    @Test
+    void imageErrorCodesAreInTheProblemSchema() {
+        List<String> codes = doc().getList("components.schemas.Problem.properties.code.enum");
+        assertTrue(codes.containsAll(List.of("IMAGE_INVALID", "IMAGE_TOO_LARGE", "IMAGE_UNSUPPORTED_TYPE",
+                "IMAGE_STORAGE_UNAVAILABLE", "IMAGE_NOT_FOUND", "IMAGE_IN_USE")));
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void adminContactMessagesOperationIsDocumentedWithTagSecurityParametersAndEveryOutput() {
+        String op = "paths.'" + ADMIN_MESSAGES + "'.get";
+        assertEquals(Set.of("get"), doc().getMap("paths.'" + ADMIN_MESSAGES + "'").keySet());
+        assertEquals("adminListContactMessages", doc().getString(op + ".operationId"));
+        assertTrue(doc().getString(op + ".description").length() > 30);
+        assertEquals(List.of("Admin"), doc().getList(op + ".tags"));
+        assertNotNull(doc().get(op + ".security"));
+        Map<String, Object> responses = doc().getMap(op + ".responses");
+        assertEquals(Set.of("200", "400", "401", "500"), responses.keySet());
+        responses.forEach((code, response) -> {
+            Map<String, Object> content = (Map<String, Object>) ((Map<String, Object>) response).get("content");
+            assertFalse(content.isEmpty(), code);
+            content.forEach((media, definition) -> assertTrue(((Map<String, Object>) definition).get("example") != null
+                    || ((Map<String, Object>) definition).get("examples") != null, code + " sin ejemplo"));
+        });
+        List<Map<String, Object>> params = doc().getList(op + ".parameters");
+        for (String name : List.of("limit", "before")) {
+            assertTrue(params.stream().anyMatch(p -> name.equals(p.get("name")) && p.get("description") != null), name);
+        }
+        for (String schema : List.of("AdminContactMessage", "AdminContactMessageList")) {
+            assertNotNull(doc().get("components.schemas." + schema + ".description"), schema);
+            Map<String, Map<String, Object>> props = doc().getMap("components.schemas." + schema + ".properties");
+            props.forEach((prop, def) -> assertTrue(def.containsKey("description") || def.containsKey("$ref"), schema + "." + prop));
+        }
+        Map<String, Object> messageProps = doc().getMap("components.schemas.AdminContactMessage.properties");
+        assertEquals(Set.of("id", "name", "email", "body", "createdAt"), messageProps.keySet());
     }
 }

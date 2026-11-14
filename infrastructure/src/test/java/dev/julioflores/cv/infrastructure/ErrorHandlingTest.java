@@ -52,6 +52,20 @@ class ErrorHandlingTest {
                 .body(not(containsString("IllegalStateException")));
     }
 
+    @Test
+    void theUnexpectedErrorIsLoggedWithTheRequestIdAndTheAccessLineSaysUnexpected() { // T13
+        try (LogRecords logs = LogRecords.attach()) {
+            var response = given().when().get("/test/boom");
+            response.then().statusCode(500);
+            String rid = response.header("X-Request-Id");
+            var error = logs.await(r -> r.getLevel().intValue() >= java.util.logging.Level.SEVERE.intValue()
+                    && "Unexpected error".equals(r.getFormattedMessage())).get(0);
+            assertEquals(rid, LogRecords.mdc(error, "request_id"));
+            String line = logs.awaitAccessLine("GET /test/boom 500", rid);
+            org.junit.jupiter.api.Assertions.assertTrue(line.contains(" err=UNEXPECTED "), line);
+        }
+    }
+
     // ── Idioma: inglés por ?lang y por Accept-Language ──────────────────────────
 
     @Test
@@ -125,5 +139,14 @@ class ErrorHandlingTest {
     void errorsAreNotCached() {
         given().when().get("/test/boom").then().header("Cache-Control", nullValue());
         given().when().get("/api/v1/experience/nope").then().header("Cache-Control", nullValue());
+    }
+
+    @Test
+    void securityForbiddenIsAProblem403() { // extra fuera del plan: mapeo explícito de ForbiddenException
+        given().when().get("/test/boom/forbidden")
+                .then().statusCode(403)
+                .header("Content-Type", containsString(PROBLEM_JSON))
+                .body("code", equalTo("FORBIDDEN"))
+                .body("title", equalTo("Acceso denegado"));
     }
 }

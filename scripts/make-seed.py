@@ -28,6 +28,12 @@ FILE_NAME = re.compile(r"^(resume|services|projects|architecture)\.([a-z]{2})\.j
 ADAPTER_STATUS = {"in-this-api", "production", "experiment"}
 RELATIONS = {"own", "employer"}
 DISCLOSURES = {"public", "anonymous"}
+# Mismas reglas que el validador de la API (ContentValidator): la clave la genera el servidor al subir la imagen.
+IMAGE_KEY = re.compile(r"^site/projects/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(jpg|png|webp|gif)$")
+IMAGE_FIELDS = {"key", "alt", "width", "height"}
+MAX_IMAGES = 10
+MAX_ALT = 200
+MAX_IMAGE_SIDE = 20000
 
 
 def table_and_filter(kind: str, lang: str) -> tuple[str, str]:
@@ -97,6 +103,44 @@ def check_projects(name: str, lang: str, document: dict) -> None:
             fail(name, f"{where} es anónimo pero trae 'client': quítalo y describe al cliente en 'clientLabel'")
         if item["disclosure"] == "public" and item["relation"] == "employer" and not item.get("client"):
             fail(name, f"{where} es público y de una empresa, pero no trae 'client'")
+        check_images(name, item, where)
+
+
+def is_positive_int(value: object) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, float):
+        value = int(value) if value.is_integer() else 0
+    return isinstance(value, int) and 0 < value <= MAX_IMAGE_SIDE
+
+
+def check_images(name: str, project: dict, where: str) -> None:
+    """Solo un proyecto propio y público lleva imágenes (una captura de uno de empleador o anónimo podría desvelar al cliente)."""
+    images = project.get("images")
+    if images is None or images == []:
+        return
+    if not isinstance(images, list):
+        fail(name, f"{where}.images debe ser una lista")
+    if project["relation"] != "own" or project["disclosure"] != "public":
+        fail(name, f"{where} lleva 'images' pero solo un proyecto propio ('own') y público ('public') puede llevarlas")
+    if len(images) > MAX_IMAGES:
+        fail(name, f"{where}.images tiene más de {MAX_IMAGES} imágenes")
+    for j, image in enumerate(images):
+        at = f"{where}.images[{j}]"
+        if not isinstance(image, dict):
+            fail(name, f"{at} debe ser un objeto")
+        extra = sorted(set(image) - IMAGE_FIELDS)
+        if extra:
+            fail(name, f"{at} tiene campos desconocidos: {', '.join(extra)}")
+        key = image.get("key")
+        if not isinstance(key, str) or not IMAGE_KEY.match(key):
+            fail(name, f"{at}.key debe tener la forma site/projects/<uuid>.<jpg|png|webp|gif>")
+        alt = image.get("alt")
+        if not isinstance(alt, str) or not alt.strip() or len(alt) > MAX_ALT:
+            fail(name, f"{at}.alt es obligatorio (hasta {MAX_ALT} caracteres)")
+        for side in ("width", "height"):
+            if not is_positive_int(image.get(side)):
+                fail(name, f"{at}.{side} debe ser un entero positivo (hasta {MAX_IMAGE_SIDE})")
 
 
 def check_architecture(name: str, lang: str, document: dict) -> None:

@@ -12,6 +12,7 @@ import dev.julioflores.cv.domain.Disclosure;
 import dev.julioflores.cv.domain.Period;
 import dev.julioflores.cv.domain.PortAdapter;
 import dev.julioflores.cv.domain.Project;
+import dev.julioflores.cv.domain.ProjectImage;
 import dev.julioflores.cv.domain.ProjectLink;
 import dev.julioflores.cv.domain.ProjectRelation;
 import dev.julioflores.cv.domain.ServiceOffer;
@@ -20,7 +21,10 @@ import java.math.BigDecimal;
 import java.time.YearMonth;
 import java.util.List;
 
-/** Traduce los documentos JSON de `content_version` (columna `content`) al dominio. Un valor desconocido en un enum lanza. */
+/**
+ * Traduce los documentos JSON de `content_version` (columna `content`) al dominio. Un valor desconocido en un enum lanza.
+ * Las imágenes de un proyecto se guardan por su clave; la URL pública se compone al servirlas, no aquí.
+ */
 final class SiteContentJsonMapper {
 
     private SiteContentJsonMapper() {}
@@ -49,7 +53,9 @@ final class SiteContentJsonMapper {
                 period(n),
                 strings(n.path("stack")),
                 strings(n.path("highlights")),
-                list(n.path("links"), l -> new ProjectLink(text(l, "label"), text(l, "url")))));
+                list(n.path("links"), l -> new ProjectLink(text(l, "label"), text(l, "url"))),
+                list(n.path("images"), i -> new ProjectImage(
+                        text(i, "key"), text(i, "alt"), i.path("width").asInt(), i.path("height").asInt()))));
     }
 
     private static Period period(JsonNode project) {

@@ -26,6 +26,7 @@
     <jacoco.version>0.8.16</jacoco.version>
     <hapi-hl7v2.version>2.6.0</hapi-hl7v2.version>
     <hapi-fhir.version>8.12.1</hapi-fhir.version>
+    <aws-sdk.version>2.54.13</aws-sdk.version>
   </properties>
 
   <dependencyManagement>
@@ -34,6 +35,14 @@
         <groupId>io.quarkus.platform</groupId>
         <artifactId>quarkus-bom</artifactId>
         <version>${quarkus.platform.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+      <!-- AWS SDK v2 directo (no la extensión de Quarkiverse): es la versión que valida quarkus-amazon-services 3.40.1. -->
+      <dependency>
+        <groupId>software.amazon.awssdk</groupId>
+        <artifactId>bom</artifactId>
+        <version>${aws-sdk.version}</version>
         <type>pom</type>
         <scope>import</scope>
       </dependency>

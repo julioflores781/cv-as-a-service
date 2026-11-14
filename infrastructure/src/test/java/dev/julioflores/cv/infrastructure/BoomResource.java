@@ -15,4 +15,11 @@ public class BoomResource {
     public String boom() {
         throw new IllegalStateException("secret internal detail: db password is hunter2");
     }
+
+    @GET
+    @Path("/forbidden")
+    @Operation(hidden = true)
+    public String forbidden() {
+        throw new io.quarkus.security.ForbiddenException();
+    }
 }

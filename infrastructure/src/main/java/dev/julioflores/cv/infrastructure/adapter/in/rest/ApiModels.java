@@ -19,6 +19,7 @@ import dev.julioflores.cv.domain.SkillGroup;
 import dev.julioflores.cv.domain.WorkExperience;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
@@ -205,7 +206,15 @@ final class ApiModels {
             @Schema(nullable = true, description = "Cuándo trabajé en él.") PeriodDto period,
             @Schema(required = true, description = "Tecnologías usadas.") List<String> stack,
             @Schema(required = true, description = "Logros y decisiones destacadas. Vacío si no aplica.") List<String> highlights,
-            @Schema(required = true, description = "Enlaces relacionados. Vacío si no aplica.") List<ProjectLinkDto> links) {}
+            @Schema(required = true, description = "Enlaces relacionados. Vacío si no aplica.") List<ProjectLinkDto> links,
+            @Schema(required = true, description = "Capturas del proyecto; la primera es la portada. Vacío si no hay (y siempre vacío en un proyecto de empleador o anónimo).") List<ProjectImageDto> images) {}
+
+    @Schema(name = "ProjectImage", description = "Una imagen de un proyecto, servida desde el almacenamiento de medios.")
+    record ProjectImageDto(
+            @Schema(required = true, description = "URL pública (inmutable: la clave cambia si cambia la imagen).", example = "https://media.example.com/site/projects/9f1c2d7e-1111-4a2b-8c3d-aaaaaaaaaaaa.webp") String url,
+            @Schema(required = true, description = "Texto alternativo, en el idioma pedido.", example = "Panel de reservas con la agenda semanal") String alt,
+            @Schema(required = true, description = "Ancho en píxeles.", example = "1280") int width,
+            @Schema(required = true, description = "Alto en píxeles.", example = "720") int height) {}
 
     @Schema(name = "PortAdapter", description = "Una tecnología que se enchufa a un puerto.")
     record PortAdapterDto(
@@ -237,11 +246,15 @@ final class ApiModels {
                 price == null ? null : new ServicePriceDto(price.from(), price.currency()));
     }
 
-    static ProjectDto toDto(Project p) {
+    /** @param imageUrl la URL pública de una clave; vacío si el almacenamiento no está configurado (entonces no se exponen imágenes) */
+    static ProjectDto toDto(Project p, Function<String, Optional<String>> imageUrl) {
         return new ProjectDto(
                 p.id(), p.title(), p.summary(), p.relation().value(), p.role(), p.disclosure().value(), p.client(),
                 p.clientLabel(), p.period() == null ? null : toDto(p.period()), p.stack(), p.highlights(),
-                map(p.links(), l -> new ProjectLinkDto(l.label(), l.url())));
+                map(p.links(), l -> new ProjectLinkDto(l.label(), l.url())),
+                p.images().stream()
+                        .flatMap(i -> imageUrl.apply(i.key()).map(url -> new ProjectImageDto(url, i.alt(), i.width(), i.height())).stream())
+                        .toList());
     }
 
     static ArchitectureDto toDto(Architecture a) {

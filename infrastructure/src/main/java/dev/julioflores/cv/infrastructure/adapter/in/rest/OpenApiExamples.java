@@ -170,7 +170,25 @@ final class OpenApiExamples {
                 "period": { "start": "2021-03", "end": "2022-09", "current": false },
                 "stack": ["Java", "Quarkus", "PostgreSQL", "React"],
                 "highlights": ["Reservas sin solapamientos", "Avisos a los pacientes"],
-                "links": []
+                "links": [],
+                "images": []
+              },
+              {
+                "id": "reservas-padel",
+                "title": "Reservas de pistas",
+                "summary": "Un producto propio para reservar pistas de pádel.",
+                "relation": "own",
+                "role": "Producto completo",
+                "disclosure": "public",
+                "client": null,
+                "clientLabel": null,
+                "period": { "start": "2024-01", "end": null, "current": true },
+                "stack": ["Java", "Quarkus"],
+                "highlights": [],
+                "links": [],
+                "images": [
+                  { "url": "https://media.example.com/site/projects/9f1c2d7e-1111-4a2b-8c3d-aaaaaaaaaaaa.webp", "alt": "Panel de reservas con la agenda semanal", "width": 1280, "height": 720 }
+                ]
               }
             ]""";
 
@@ -188,7 +206,25 @@ final class OpenApiExamples {
                 "period": { "start": "2021-03", "end": "2022-09", "current": false },
                 "stack": ["Java", "Quarkus", "PostgreSQL", "React"],
                 "highlights": ["Bookings without overlaps", "Patient reminders"],
-                "links": []
+                "links": [],
+                "images": []
+              },
+              {
+                "id": "reservas-padel",
+                "title": "Court bookings",
+                "summary": "A product of my own to book padel courts.",
+                "relation": "own",
+                "role": "Whole product",
+                "disclosure": "public",
+                "client": null,
+                "clientLabel": null,
+                "period": { "start": "2024-01", "end": null, "current": true },
+                "stack": ["Java", "Quarkus"],
+                "highlights": [],
+                "links": [],
+                "images": [
+                  { "url": "https://media.example.com/site/projects/9f1c2d7e-1111-4a2b-8c3d-aaaaaaaaaaaa.webp", "alt": "Booking dashboard with the weekly agenda", "width": 1280, "height": 720 }
+                ]
               }
             ]""";
 

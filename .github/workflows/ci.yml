@@ -31,6 +31,10 @@ jobs:
       - name: Build y pruebas
         run: mvn -B verify
 
+      # Pruebas del generador del seed (scripts/make-seed.py): validan el contenido, `images` y el rechazo de `client` en anónimos.
+      - name: Pruebas de los scripts (Python)
+        run: python3 -m unittest discover -s scripts -p 'test_*.py' -v
+
       # Muestra en el resumen del pipeline el detalle de cada prueba y la cobertura.
       # Falla si hay pruebas rotas, faltan informes o la cobertura baja de los umbrales.
       - name: Resumen de pruebas y cobertura
@@ -125,9 +129,14 @@ jobs:
             -e POSTGRES_DB=cv -e POSTGRES_USER=cv -e POSTGRES_PASSWORD=ci postgres:16-alpine
           # -h 127.0.0.1: por TCP, como se conectará la API (por el socket responde también durante la inicialización).
           until docker exec cv-db pg_isready -h 127.0.0.1 -U cv -d cv >/dev/null 2>&1; do sleep 1; done
+          # CV_ADMIN_JWT_SECRET es un valor de prueba, sin valor fuera de este contenedor desechable: activa el admin para comprobar su 401.
+          # R2_PUBLIC_URL (sin credenciales de R2: la subida queda deshabilitada) solo compone las URLs de las imágenes del ejemplo.
           docker run -d --name cv-api --network cvnet -p 8080:8080 \
             -e QUARKUS_DATASOURCE_JDBC_URL=jdbc:postgresql://cv-db:5432/cv \
-            -e QUARKUS_DATASOURCE_USERNAME=cv -e QUARKUS_DATASOURCE_PASSWORD=ci cv-api:ci
+            -e QUARKUS_DATASOURCE_USERNAME=cv -e QUARKUS_DATASOURCE_PASSWORD=ci \
+            -e CV_ADMIN_JWT_SECRET=ci-only-throwaway-secret-0123456789-abcdef \
+            -e CV_ADMIN_EDGE_BLOCK=true \
+            -e R2_PUBLIC_URL=https://media.example.test cv-api:ci
           # Flyway crea el esquema al arrancar la API; sin él no hay donde aplicar el seed.
           ready=false
           for i in $(seq 1 60); do

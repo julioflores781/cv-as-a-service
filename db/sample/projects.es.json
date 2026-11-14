@@ -12,7 +12,10 @@
       "startDate": "2022-01",
       "stack": ["Java", "Quarkus", "PostgreSQL"],
       "highlights": ["Un logro de ejemplo"],
-      "links": [{ "label": "Ver el proyecto", "url": "https://example.com/proyecto" }]
+      "links": [{ "label": "Ver el proyecto", "url": "https://example.com/proyecto" }],
+      "images": [
+        { "key": "site/projects/00000000-0000-4000-8000-000000000001.webp", "alt": "Panel de reservas con la agenda semanal de ejemplo", "width": 1280, "height": 720 }
+      ]
     },
     {
       "id": "proyecto-anonimo",

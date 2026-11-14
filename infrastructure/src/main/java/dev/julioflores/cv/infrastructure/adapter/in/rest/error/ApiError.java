@@ -19,9 +19,27 @@ public enum ApiError {
     HL7_UNSUPPORTED_MESSAGE(422),
     CONTACT_INVALID(400),
     CONTACT_RATE_LIMITED(429),
+    ADMIN_INVALID_CREDENTIALS(401),
+    ADMIN_LOGIN_LOCKED(429),
+    ADMIN_LOGIN_RATE_LIMITED(429),
+    ADMIN_UNAUTHORIZED(401),
+    ADMIN_CURRENT_PASSWORD_WRONG(403),
+    ADMIN_WEAK_PASSWORD(422),
+    CONTENT_VERSION_CONFLICT(409),
+    CONTENT_VERSION_NOT_FOUND(404),
+    CONTENT_INVALID(422),
+    CONTENT_PARITY_BROKEN(422),
+    CONTENT_TOO_LARGE(413),
+    IMAGE_INVALID(400),
+    IMAGE_TOO_LARGE(413),
+    IMAGE_UNSUPPORTED_TYPE(415),
+    IMAGE_STORAGE_UNAVAILABLE(503),
+    IMAGE_NOT_FOUND(404),
+    IMAGE_IN_USE(409),
+    NOT_FOUND(404),
     // Errores de transporte, sin ErrorCode de negocio
     BAD_REQUEST(400),
-    NOT_FOUND(404),
+    FORBIDDEN(403),
     METHOD_NOT_ALLOWED(405),
     NOT_ACCEPTABLE(406),
     UNSUPPORTED_MEDIA_TYPE(415),
@@ -44,6 +62,8 @@ public enum ApiError {
     /** Errores de JAX-RS (ruta inexistente, método no permitido…). Lo desconocido cae en 400 o 500. */
     static ApiError fromStatus(int status) {
         return switch (status) {
+            case 401 -> ADMIN_UNAUTHORIZED;
+            case 403 -> FORBIDDEN;
             case 404 -> NOT_FOUND;
             case 405 -> METHOD_NOT_ALLOWED;
             case 406 -> NOT_ACCEPTABLE;

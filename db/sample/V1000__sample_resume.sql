@@ -117,6 +117,14 @@ SELECT 'projects', 'en', COALESCE(MAX(version), 0) + 1, $projects$
           "label": "See the project",
           "url": "https://example.com/proyecto"
         }
+      ],
+      "images": [
+        {
+          "key": "site/projects/00000000-0000-4000-8000-000000000001.webp",
+          "alt": "Sample booking dashboard with the weekly agenda",
+          "width": 1280,
+          "height": 720
+        }
       ]
     },
     {
@@ -169,6 +177,14 @@ SELECT 'projects', 'es', COALESCE(MAX(version), 0) + 1, $projects$
         {
           "label": "Ver el proyecto",
           "url": "https://example.com/proyecto"
+        }
+      ],
+      "images": [
+        {
+          "key": "site/projects/00000000-0000-4000-8000-000000000001.webp",
+          "alt": "Panel de reservas con la agenda semanal de ejemplo",
+          "width": 1280,
+          "height": 720
         }
       ]
     },

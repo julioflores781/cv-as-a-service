@@ -5,10 +5,13 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
+import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.response.ValidatableResponse;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
@@ -106,6 +109,19 @@ class Hl7ResourceTest {
     @Test
     void bodyOverTheHardServerLimitIsCutBeforeReading() {
         post("x".repeat(200 * 1024), "").statusCode(413);
+    }
+
+    @TestHTTPResource("/api/v1/hl7/translate")
+    URI hl7;
+
+    @Test
+    void bodiesOverTheFixedPublicLimitAreCutWhetherTheyDeclareTheirLengthOrAreChunked() { // T137 (límite global ampliado para las imágenes)
+        byte[] oneHundredFortyKb = "x".repeat(140 * 1024).getBytes(StandardCharsets.UTF_8);
+        byte[] fourMb = "x".repeat(4 * 1024 * 1024).getBytes(StandardCharsets.UTF_8);
+        assertEquals(413, RawHttp.postWithLength(hl7, "text/plain", oneHundredFortyKb));
+        assertEquals(413, RawHttp.postChunked(hl7, "text/plain", oneHundredFortyKb));
+        assertEquals(413, RawHttp.postWithLength(hl7, "text/plain", fourMb));
+        assertEquals(413, RawHttp.postChunked(hl7, "text/plain", fourMb));
     }
 
     @Test
